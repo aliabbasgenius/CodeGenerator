@@ -14,15 +14,18 @@ namespace CodeGenerator.API.Services
     {
         private readonly IDatabaseDiscoveryService _databaseService;
         private readonly IAngularCodeGenerationService _angularService;
+        private readonly NavigationIntegrationService _navigationService;
         private readonly ILogger<DatabaseCodeGenerationService> _logger;
 
         public DatabaseCodeGenerationService(
             IDatabaseDiscoveryService databaseService,
             IAngularCodeGenerationService angularService,
+            NavigationIntegrationService navigationService,
             ILogger<DatabaseCodeGenerationService> logger)
         {
             _databaseService = databaseService;
             _angularService = angularService;
+            _navigationService = navigationService;
             _logger = logger;
         }
 
@@ -70,6 +73,10 @@ namespace CodeGenerator.API.Services
                             {
                                 await WriteFileToDiskAsync(file);
                             }
+                            
+                            // Update navigation automatically
+                            await _navigationService.UpdateAppRoutesAsync(table, request.AngularPath);
+                            await _navigationService.UpdateSidebarAsync(table, request.AngularPath);
                             
                             generatedFiles.AddRange(angularFiles);
                         }
@@ -206,6 +213,114 @@ namespace CodeGenerator.API.Services
             return files;
         }
 
+        private List<GeneratedFile> GenerateNavigationUpdates(DatabaseTable table, string basePath)
+        {
+            var files = new List<GeneratedFile>();
+            var className = ToPascalCase(table.TableName);
+            var camelCaseName = ToCamelCase(table.TableName);
+
+            try
+            {
+                // Generate routes update file
+                var routeUpdateContent = GenerateRouteUpdateScript(table);
+                files.Add(new GeneratedFile
+                {
+                    FileName = $"update-{camelCaseName}-routes.ts",
+                    FilePath = $"{basePath}/generated/{camelCaseName}-route-update.ts",
+                    FileType = "route-update",
+                    Content = routeUpdateContent
+                });
+
+                // Generate sidebar update file
+                var sidebarUpdateContent = GenerateSidebarUpdateScript(table);
+                files.Add(new GeneratedFile
+                {
+                    FileName = $"update-{camelCaseName}-sidebar.ts",
+                    FilePath = $"{basePath}/generated/{camelCaseName}-sidebar-update.ts",
+                    FileType = "sidebar-update",
+                    Content = sidebarUpdateContent
+                });
+
+                _logger.LogInformation("Generated {FileCount} navigation update files for table {TableName}", files.Count, table.TableName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating navigation update files for table {TableName}", table.TableName);
+                throw;
+            }
+
+            return files;
+        }
+
+        private static string GenerateRouteUpdateScript(DatabaseTable table)
+        {
+            var className = ToPascalCase(table.TableName);
+            var camelCaseName = ToCamelCase(table.TableName);
+
+            return $@"// Auto-generated route update for {className}
+// This file provides the import statements and route configurations
+// to add to your app.routes.ts file
+
+export const {camelCaseName}RouteConfig = {{
+  imports: [
+    ""import {{ {className}List }} from './components/{camelCaseName}-list/{camelCaseName}-list';"",
+    ""import {{ {className}Form }} from './components/{camelCaseName}-form/{camelCaseName}-form';""
+  ],
+  routes: [
+    ""{{ path: '{camelCaseName}', component: {className}List, canActivate: [authGuard] }},"",
+    ""{{ path: '{camelCaseName}/new', component: {className}Form, canActivate: [authGuard] }},"",
+    ""{{ path: '{camelCaseName}/edit/:id', component: {className}Form, canActivate: [authGuard] }},""
+  ]
+}};
+
+// Instructions:
+// 1. Add the import statements to the top of your app.routes.ts file
+// 2. Add the route objects to your routes array
+// 3. The routes should be placed before the wildcard route (path: '**')
+
+console.log('Route configuration for {className}:');
+console.log('Add these imports to app.routes.ts:');
+{camelCaseName}RouteConfig.imports.forEach(imp => console.log(imp));
+console.log('\\nAdd these routes to the routes array:');
+{camelCaseName}RouteConfig.routes.forEach(route => console.log(route));
+";
+        }
+
+        private static string GenerateSidebarUpdateScript(DatabaseTable table)
+        {
+            var className = ToPascalCase(table.TableName);
+            var camelCaseName = ToCamelCase(table.TableName);
+
+            return $@"// Auto-generated sidebar menu update for {className}
+// This file provides the menu item configuration to add to your sidebar
+
+export const {camelCaseName}MenuItem = {{
+  title: '{className}',
+  icon: '📋',
+  route: '/{camelCaseName}'
+}};
+
+// Instructions:
+// 1. Open your sidebar.ts file (typically in components/sidebar/sidebar.ts)
+// 2. Add the menu item to your menuItems array
+// 3. Place it in the appropriate position in the array
+
+// Example of where to add it:
+/*
+menuItems: MenuItem[] = [
+  {{ title: 'Dashboard', icon: '📊', route: '/dashboard' }},
+  {{ title: 'Code Generator', icon: '🔧', route: '/code-generator' }},
+  {{ title: 'Products', icon: '📦', route: '/products' }},
+  {{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}, // <- Add this line
+  {{ title: 'Settings', icon: '⚙️', route: '/settings' }}
+];
+*/
+
+console.log('Menu item for {className}:');
+console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }},`);
+";
+        }
+
         private async Task WriteFileToDiskAsync(GeneratedFile file)
         {
             try
@@ -279,6 +394,9 @@ namespace CodeGenerator.API.Services
                     }
                 }
 
+                // Cleanup navigation entries for generated components
+                await CleanupNavigationEntriesAsync(request.AngularPath, deletedFiles, errors);
+
                 result.Success = errors.Count == 0;
                 result.DeletedFiles = deletedFiles;
                 result.Errors = errors;
@@ -298,6 +416,72 @@ namespace CodeGenerator.API.Services
             }
 
             return result;
+        }
+
+        private async Task CleanupNavigationEntriesAsync(string angularPath, List<string> deletedFiles, List<string> errors)
+        {
+            try
+            {
+                // Get list of generated table names from the components that were deleted
+                var componentsDirectory = Path.Combine(angularPath, "components");
+                if (!Directory.Exists(componentsDirectory))
+                    return;
+
+                var generatedTableNames = new List<string>();
+                var directories = Directory.GetDirectories(componentsDirectory);
+                
+                foreach (var dir in directories)
+                {
+                    var dirName = Path.GetFileName(dir);
+                    if (IsGeneratedComponentDirectory(dirName))
+                    {
+                        // Extract table name from component directory name
+                        var tableName = ExtractTableNameFromComponentDirectory(dirName);
+                        if (!string.IsNullOrEmpty(tableName) && !generatedTableNames.Contains(tableName))
+                        {
+                            generatedTableNames.Add(tableName);
+                        }
+                    }
+                }
+
+                // Remove navigation entries for each generated table
+                foreach (var tableName in generatedTableNames)
+                {
+                    try
+                    {
+                        await _navigationService.RemoveFromAppRoutesAsync(tableName, angularPath);
+                        await _navigationService.RemoveFromSidebarAsync(tableName, angularPath);
+                        _logger.LogInformation("Removed navigation entries for {TableName}", tableName);
+                    }
+                    catch (Exception ex)
+                    {
+                        errors.Add($"Failed to remove navigation entries for {tableName}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Failed to cleanup navigation entries: {ex.Message}");
+                _logger.LogError(ex, "Error during navigation cleanup");
+            }
+        }
+
+        private string ExtractTableNameFromComponentDirectory(string directoryName)
+        {
+            // Convert component directory name back to table name
+            // e.g., "authors-list" -> "Authors", "book-categories-form" -> "BookCategories"
+            if (directoryName.EndsWith("-list"))
+            {
+                var baseName = directoryName.Substring(0, directoryName.Length - 5); // Remove "-list"
+                return ToPascalCase(baseName.Replace("-", ""));
+            }
+            else if (directoryName.EndsWith("-form"))
+            {
+                var baseName = directoryName.Substring(0, directoryName.Length - 5); // Remove "-form"
+                return ToPascalCase(baseName.Replace("-", ""));
+            }
+            
+            return string.Empty;
         }
 
         private async Task CleanupGeneratedComponentsAsync(string componentsDirectory, List<string> deletedFiles, List<string> errors)
