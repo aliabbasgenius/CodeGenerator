@@ -29,10 +29,37 @@ CodeGenerator/
 │   ├── Program.cs                       # Application startup
 │   ├── appsettings.json                # Configuration
 │   └── CodeGenerator.API.csproj        # Project file
+├── AngularApp/                         # Frontend Angular application
+│   ├── src/app/                        # Angular components and services
+│   │   ├── components/                 # UI components (login, dashboard, etc.)
+│   │   ├── services/                   # Authentication and API services
+│   │   └── guards/                     # Route protection
+│   ├── package.json                    # Node.js dependencies
+│   └── README.md                       # Angular app documentation
 └── README.md                           # This file
 ```
 
-## 🛠️ Getting Started
+## �️ Applications
+
+### 1. CodeGenerator.API (.NET Core Web API)
+The backend REST API that provides code generation capabilities with Swagger documentation.
+
+### 2. AngularApp (Angular Frontend)
+A modern web application that provides:
+- **🔐 Login System**: Simple authentication (admin/admin)
+- **📊 Dashboard**: Professional admin interface with navigation menu
+- **📱 Responsive Design**: Works perfectly on desktop, tablet, and mobile
+- **🎨 Modern UI**: Clean design with gradients, animations, and professional styling
+
+**Quick Start for Angular App:**
+```bash
+cd AngularApp
+npm install
+ng serve
+# Open http://localhost:4200 and login with admin/admin
+```
+
+## �🛠️ Getting Started
 
 ### Prerequisites
 

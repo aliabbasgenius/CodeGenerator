@@ -1,6 +1,6 @@
-# AngularApp
+# CodeGenerator - Angular Frontend Application
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.3.3.
+A modern Angular application with authentication and admin dashboard for the CodeGenerator solution.
 
 ## Development server
 
