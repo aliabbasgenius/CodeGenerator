@@ -1,0 +1,57 @@
+<div class="login-container">
+  <div class="login-form">
+    <div class="login-header">
+      <h2>Login to CodeGenerator</h2>
+      <p>Please enter your credentials</p>
+    </div>
+
+    <form (ngSubmit)="onSubmit()" #loginForm="ngForm">
+      <div class="form-group">
+        <label for="username">Username:</label>
+        <input 
+          type="text" 
+          id="username" 
+          name="username"
+          [(ngModel)]="username"
+          (input)="clearError()"
+          placeholder="Enter username (admin)"
+          required
+          class="form-control"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password:</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password"
+          [(ngModel)]="password"
+          (input)="clearError()"
+          placeholder="Enter password (admin)"
+          required
+          class="form-control"
+        >
+      </div>
+
+      <div class="error-message" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </div>
+
+      <button 
+        type="submit" 
+        class="btn-login" 
+        [disabled]="isLoading || !username || !password"
+      >
+        <span *ngIf="isLoading">Logging in...</span>
+        <span *ngIf="!isLoading">Login</span>
+      </button>
+    </form>
+
+    <div class="login-info">
+      <p><strong>Default Credentials:</strong></p>
+      <p>Username: admin</p>
+      <p>Password: admin</p>
+    </div>
+  </div>
+</div>

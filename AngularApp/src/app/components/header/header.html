@@ -1,0 +1,18 @@
+<header class="main-header">
+  <div class="header-content">
+    <div class="logo-section">
+      <h1>CodeGenerator</h1>
+      <span class="tagline">Admin Panel</span>
+    </div>
+    
+    <div class="header-actions">
+      <div class="user-info">
+        <span class="welcome-text">Welcome, {{ currentUser }}!</span>
+        <button class="btn-logout" (click)="logout()">
+          <i class="logout-icon">🚪</i>
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+</header>

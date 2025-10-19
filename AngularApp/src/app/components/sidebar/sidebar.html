@@ -1,0 +1,25 @@
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <ul class="menu-list">
+      <li 
+        *ngFor="let item of menuItems" 
+        class="menu-item"
+        [class.active]="item.isActive"
+      >
+        <a 
+          [routerLink]="item.route" 
+          class="menu-link"
+          (click)="setActiveItem(item)"
+          routerLinkActive="active"
+        >
+          <span class="menu-icon">{{ item.icon }}</span>
+          <span class="menu-text">{{ item.title }}</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  
+  <div class="sidebar-footer">
+    <p class="app-version">v1.0.0</p>
+  </div>
+</aside>

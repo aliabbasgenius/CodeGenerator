@@ -1,0 +1,87 @@
+<div class="dashboard-layout">
+  <app-header></app-header>
+  
+  <div class="main-container">
+    <app-sidebar></app-sidebar>
+    
+    <main class="content-area">
+      <div class="dashboard-content">
+        <div class="page-header">
+          <h1>Dashboard</h1>
+          <p>Welcome to the CodeGenerator Admin Panel</p>
+        </div>
+        
+        <!-- Statistics Cards -->
+        <div class="stats-grid">
+          <div class="stat-card" *ngFor="let stat of stats">
+            <div class="stat-icon">{{ stat.icon }}</div>
+            <div class="stat-info">
+              <h3>{{ stat.value }}</h3>
+              <p>{{ stat.title }}</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Main Content Sections -->
+        <div class="content-grid">
+          <!-- Quick Actions -->
+          <div class="content-card">
+            <h2>Quick Actions</h2>
+            <div class="quick-actions">
+              <button class="action-btn primary">
+                <span>⚙️</span>
+                Generate Project
+              </button>
+              <button class="action-btn secondary">
+                <span>📄</span>
+                Create Template
+              </button>
+              <button class="action-btn secondary">
+                <span>📁</span>
+                View Projects
+              </button>
+              <button class="action-btn secondary">
+                <span>⚙️</span>
+                Settings
+              </button>
+            </div>
+          </div>
+          
+          <!-- Recent Activity -->
+          <div class="content-card">
+            <h2>Recent Activity</h2>
+            <div class="activity-list">
+              <div class="activity-item" *ngFor="let activity of recentActivities">
+                <div class="activity-content">
+                  <p class="activity-action">{{ activity.action }}</p>
+                  <span class="activity-time">{{ activity.time }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- System Information -->
+        <div class="content-card">
+          <h2>System Information</h2>
+          <div class="system-info">
+            <div class="info-row">
+              <span class="info-label">Application Version:</span>
+              <span class="info-value">1.0.0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Last Updated:</span>
+              <span class="info-value">{{ currentDate }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Status:</span>
+              <span class="info-value status-online">Online</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  
+  <app-footer></app-footer>
+</div>

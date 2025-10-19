@@ -1,0 +1,144 @@
+.sidebar {
+  width: 250px;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #34495e 0%, #2c3e50 100%);
+  color: #ecf0f1;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  top: 70px; /* Height of header */
+  z-index: 999;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 1rem 0;
+}
+
+.menu-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.menu-item {
+  margin-bottom: 0.5rem;
+}
+
+.menu-link {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  color: #bdc3c7;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border-left: 3px solid transparent;
+}
+
+.menu-link:hover {
+  background: rgba(52, 152, 219, 0.1);
+  color: #3498db;
+  border-left-color: #3498db;
+}
+
+.menu-link.active {
+  background: rgba(52, 152, 219, 0.2);
+  color: #3498db;
+  border-left-color: #3498db;
+  font-weight: 600;
+}
+
+.menu-icon {
+  font-size: 1.2rem;
+  margin-right: 0.75rem;
+  width: 20px;
+  text-align: center;
+}
+
+.menu-text {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.sidebar-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid rgba(236, 240, 241, 0.1);
+  text-align: center;
+}
+
+.app-version {
+  font-size: 0.8rem;
+  color: #95a5a6;
+  margin: 0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 200px;
+    top: 60px; /* Adjusted for mobile header height */
+  }
+  
+  .menu-link {
+    padding: 0.75rem 1rem;
+  }
+  
+  .menu-text {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    width: 100%;
+    position: static;
+    min-height: auto;
+    top: 0;
+  }
+  
+  .sidebar-nav {
+    padding: 0.5rem 0;
+  }
+  
+  .menu-list {
+    display: flex;
+    overflow-x: auto;
+    padding: 0 1rem;
+  }
+  
+  .menu-item {
+    margin-bottom: 0;
+    margin-right: 0.5rem;
+    min-width: 120px;
+  }
+  
+  .menu-link {
+    padding: 0.5rem;
+    border-radius: 5px;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .menu-link:hover,
+  .menu-link.active {
+    border-left: none;
+    border-bottom-color: #3498db;
+  }
+  
+  .menu-icon {
+    margin-right: 0;
+    margin-bottom: 0.25rem;
+  }
+  
+  .menu-text {
+    font-size: 0.8rem;
+  }
+  
+  .sidebar-footer {
+    display: none;
+  }
+}
