@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Cors;
 using CodeGenerator.API.Services;
 using CodeGenerator.API.Models;
 
@@ -6,6 +7,7 @@ namespace CodeGenerator.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [EnableCors("AllowAngularApp")]
     public class DatabaseController : ControllerBase
     {
         private readonly IDatabaseDiscoveryService _databaseService;

@@ -29,6 +29,14 @@ builder.Services.AddScoped<IDatabaseCodeGenerationService, DatabaseCodeGeneratio
 // Add CORS
 builder.Services.AddCors(options =>
 {
+    options.AddPolicy("AllowAngularApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200", "http://localhost:4201", "http://localhost:53691", "http://localhost:3000")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+    
     options.AddPolicy("AllowAll", policy =>
     {
         policy.AllowAnyOrigin()
@@ -50,8 +58,10 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Enable CORS first
+app.UseCors("AllowAngularApp");
+
 app.UseHttpsRedirection();
-app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();
 

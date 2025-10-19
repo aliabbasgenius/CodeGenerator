@@ -819,7 +819,7 @@ export class {componentName} implements OnInit {{
               type=""submit"" 
               class=""btn btn-primary""
               [disabled]=""{camelCaseName}Form.invalid || isSubmitting"">
-              {{ isSubmitting ? 'Saving...' : (isEditMode ? 'Update' : 'Create') }} {className}
+              {{{{ isSubmitting ? 'Saving...' : (isEditMode ? 'Update' : 'Create') }}}} {className}
             </button>
           </div>
         </form>
