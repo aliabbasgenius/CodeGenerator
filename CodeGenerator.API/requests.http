@@ -1,0 +1,65 @@
+### Health Check
+GET http://localhost:5173/api/codegenerator/health
+
+### Get Supported Technologies
+GET http://localhost:5173/api/codegenerator/supported-technologies
+
+### Get All Templates
+GET http://localhost:5173/api/codegenerator/templates
+
+### Generate C# Project
+POST http://localhost:5173/api/codegenerator/generate-project
+Content-Type: application/json
+
+{
+  "projectName": "SampleAPI",
+  "language": "csharp", 
+  "framework": "ASP.NET Core",
+  "description": "A sample Web API project for demonstration",
+  "features": ["swagger", "controllers", "models"],
+  "additionalProperties": {
+    "includeTests": true,
+    "useEntityFramework": false
+  }
+}
+
+### Generate JavaScript Project
+POST http://localhost:5173/api/codegenerator/generate-project
+Content-Type: application/json
+
+{
+  "projectName": "NodeApp",
+  "language": "javascript",
+  "framework": "Express", 
+  "description": "A Node.js Express application",
+  "features": ["express", "middleware", "routes"]
+}
+
+### Generate from C# Class Template
+POST http://localhost:5173/api/codegenerator/generate-from-template
+Content-Type: application/json
+
+{
+  "templateName": "CSharpClass",
+  "templateType": "class",
+  "parameters": {
+    "ClassName": "Product",
+    "Namespace": "ECommerce.Models"
+  }
+}
+
+### Generate from C# Controller Template
+POST http://localhost:5173/api/codegenerator/generate-from-template
+Content-Type: application/json
+
+{
+  "templateName": "CSharpController", 
+  "templateType": "controller",
+  "parameters": {
+    "ControllerName": "Product",
+    "Namespace": "ECommerce.API"
+  }
+}
+
+### Get Specific Template
+GET http://localhost:5173/api/codegenerator/templates/1
