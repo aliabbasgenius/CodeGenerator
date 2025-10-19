@@ -1,17 +1,24 @@
-<div class="product-list-container">
-  <!-- Header Section -->
-  <div class="page-header">
-    <div class="header-content">
-      <div class="title-section">
-        <h1>Product Management</h1>
-        <p>Manage your product inventory with ease</p>
-      </div>
-      <button class="btn-add-product" (click)="addProduct()">
-        <span class="icon">➕</span>
-        Add New Product
-      </button>
-    </div>
-  </div>
+<div class="dashboard-layout">
+  <app-header></app-header>
+  
+  <div class="main-container">
+    <app-sidebar></app-sidebar>
+    
+    <main class="content-area">
+      <div class="product-list-container">
+        <!-- Header Section -->
+        <div class="page-header">
+          <div class="header-content">
+            <div class="title-section">
+              <h1>Product Management</h1>
+              <p>Manage your product inventory with ease</p>
+            </div>
+            <button class="btn-add-product" (click)="addProduct()">
+              <span class="icon">➕</span>
+              Add New Product
+            </button>
+          </div>
+        </div>
 
   <!-- Filters and Search Section -->
   <div class="filters-section">
@@ -136,68 +143,65 @@
   </div>
 
   <!-- Pagination -->
-  <div class="pagination-container" *ngIf="getTotalPages() > 1">
+  <div class="pagination-container">
     <div class="pagination-info">
       <span>
-        Page {{ currentPage }} of {{ getTotalPages() }} 
-        ({{ totalItems }} total items)
+        Showing {{ getStartIndex() }} to {{ getEndIndex() }} of {{ totalItems }} items
+        <span *ngIf="getTotalPages() > 1"> (Page {{ currentPage }} of {{ getTotalPages() }})</span>
       </span>
     </div>
     
-    <div class="pagination-controls">
-      <button 
-        class="btn-page" 
-        (click)="previousPage()" 
-        [disabled]="currentPage === 1"
-      >
-        ← Previous
-      </button>
-      
-      <button 
-        *ngFor="let page of [].constructor(getTotalPages()); let i = index"
-        class="btn-page"
-        [class.active]="currentPage === i + 1"
-        (click)="goToPage(i + 1)"
-      >
-        {{ i + 1 }}
-      </button>
-      
-      <button 
-        class="btn-page" 
-        (click)="nextPage()" 
-        [disabled]="currentPage === getTotalPages()"
-      >
-        Next →
-      </button>
-    </div>
-  </div>
-
-  <!-- Summary Section -->
-  <div class="summary-section">
-    <div class="summary-cards">
-      <div class="summary-card">
-        <span class="card-icon">📊</span>
-        <div class="card-content">
-          <h4>Total Products</h4>
-          <p class="card-value">{{ products.length }}</p>
-        </div>
+    <div class="pagination-right">
+      <!-- Items per page -->
+      <div class="items-per-page" *ngIf="totalItems > 5">
+        <label for="pageSize">Items per page:</label>
+        <select 
+          id="pageSize" 
+          [(ngModel)]="itemsPerPage" 
+          (change)="onPageSizeChange()"
+          class="page-size-select"
+        >
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+        </select>
       </div>
-      
-      <div class="summary-card">
-        <span class="card-icon">📂</span>
-        <div class="card-content">
-          <h4>Categories</h4>
-          <p class="card-value">{{ getCategoriesCount() }}</p>
-        </div>
-      </div>
-      
-      <div class="summary-card">
-        <span class="card-icon">⚠️</span>
-        <div class="card-content">
-          <h4>Low Stock</h4>
-          <p class="card-value">{{ getLowStockCount() }}</p>
-        </div>
+    
+      <!-- Page navigation -->
+      <div class="pagination-controls" *ngIf="getTotalPages() > 1">
+        <button 
+          class="btn-page" 
+          (click)="previousPage()" 
+          [disabled]="currentPage === 1"
+          title="Previous page"
+        >
+          ← Previous
+        </button>
+        
+        <button 
+          *ngFor="let page of getVisiblePages()"
+          class="btn-page"
+          [class.active]="currentPage === page"
+          (click)="goToPage(page)"
+        >
+          {{ page }}
+        </button>
+        
+        <button 
+          class="btn-page" 
+          (click)="nextPage()" 
+          [disabled]="currentPage === getTotalPages()"
+          title="Next page"
+        >
+          Next →
+        </button>
       </div>
     </div>
   </div>
+      </div>
+    </main>
+  </div>
+  
+  <app-footer></app-footer>
 </div>

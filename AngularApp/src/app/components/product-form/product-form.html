@@ -1,9 +1,16 @@
-<div class="product-form-container">
-  <!-- Header -->
-  <div class="form-header">
-    <h1>{{ isEditMode ? 'Edit Product' : 'Add New Product' }}</h1>
-    <p>{{ isEditMode ? 'Update product information below' : 'Fill in the details to create a new product' }}</p>
-  </div>
+<div class="dashboard-layout">
+  <app-header></app-header>
+  
+  <div class="main-container">
+    <app-sidebar></app-sidebar>
+    
+    <main class="content-area">
+      <div class="product-form-container">
+        <!-- Header -->
+        <div class="form-header">
+          <h1>{{ isEditMode ? 'Edit Product' : 'Add New Product' }}</h1>
+          <p>{{ isEditMode ? 'Update product information below' : 'Fill in the details to create a new product' }}</p>
+        </div>
 
   <!-- Loading State -->
   <div *ngIf="isLoading" class="loading-state">
@@ -154,4 +161,9 @@
       </div>
     </div>
   </div>
+      </div>
+    </main>
+  </div>
+  
+  <app-footer></app-footer>
 </div>

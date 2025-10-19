@@ -1,7 +1,26 @@
+/* Layout Styles */
+.dashboard-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f8f9fa;
+}
+
+.main-container {
+  display: flex;
+  flex: 1;
+}
+
+.content-area {
+  flex: 1;
+  margin-left: 250px; /* Sidebar width */
+  padding: 2rem;
+  min-height: calc(100vh - 140px); /* Subtract header and footer height */
+}
+
 .product-form-container {
   max-width: 800px;
   margin: 0 auto;
-  padding: 2rem;
 }
 
 /* Header */

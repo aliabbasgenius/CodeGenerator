@@ -4,10 +4,14 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
 import { ActivatedRoute, Router } from '@angular/router';
 import { ProductService } from '../../services/product';
 import { Product } from '../../models/product.model';
+import { Header } from '../header/header';
+import { Sidebar } from '../sidebar/sidebar';
+import { Footer } from '../footer/footer';
 
 @Component({
   selector: 'app-product-form',
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  standalone: true,
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, Header, Sidebar, Footer],
   templateUrl: './product-form.html',
   styleUrl: './product-form.css'
 })

@@ -253,3 +253,35 @@
     font-size: 0.8rem;
   }
 }
+
+/* Empty Dashboard Styles */
+.empty-dashboard {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  padding: 3rem;
+}
+
+.welcome-message {
+  text-align: center;
+  background: white;
+  padding: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+}
+
+.welcome-message h2 {
+  color: #2c3e50;
+  font-size: 2rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.welcome-message p {
+  color: #7f8c8d;
+  font-size: 1.1rem;
+  margin: 0;
+  line-height: 1.6;
+}

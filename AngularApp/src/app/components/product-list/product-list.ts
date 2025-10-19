@@ -5,11 +5,14 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ProductService } from '../../services/product';
 import { Product } from '../../models/product.model';
+import { Header } from '../header/header';
+import { Sidebar } from '../sidebar/sidebar';
+import { Footer } from '../footer/footer';
 
 @Component({
   selector: 'app-product-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, Header, Sidebar, Footer],
   templateUrl: './product-list.html',
   styleUrl: './product-list.css'
 })
@@ -140,16 +143,7 @@ export class ProductList implements OnInit, OnDestroy {
   }
 
   addProduct(): void {
-    console.log('Add product clicked - navigating to /products/new');
-    this.router.navigate(['/products/new']).then(
-      success => {
-        console.log('Navigation result:', success);
-        if (!success) {
-          console.error('Navigation was blocked or failed');
-        }
-      },
-      error => console.error('Navigation error:', error)
-    );
+    this.router.navigate(['/products/new']);
   }
 
   editProduct(product: Product): void {
@@ -185,16 +179,59 @@ export class ProductList implements OnInit, OnDestroy {
     }).format(amount);
   }
 
-  // Summary calculation methods
-  getTotalValue(): number {
-    return this.filteredProducts.reduce((sum, product) => sum + (product.price * product.stockQuantity), 0);
+  // Pagination helper methods
+  getStartIndex(): number {
+    return this.totalItems === 0 ? 0 : (this.currentPage - 1) * this.itemsPerPage + 1;
   }
 
-  getCategoriesCount(): number {
-    return this.categories.length - 1; // Exclude "All" option
+  getEndIndex(): number {
+    const endIndex = this.currentPage * this.itemsPerPage;
+    return Math.min(endIndex, this.totalItems);
   }
 
-  getLowStockCount(): number {
-    return this.products.filter(p => p.stockQuantity < 10).length;
+  getVisiblePages(): number[] {
+    const totalPages = this.getTotalPages();
+    const visiblePages: number[] = [];
+    
+    if (totalPages <= 7) {
+      // Show all pages if 7 or fewer
+      for (let i = 1; i <= totalPages; i++) {
+        visiblePages.push(i);
+      }
+    } else {
+      // Show smart pagination with ellipsis
+      if (this.currentPage <= 4) {
+        // Show first 5 pages + last page
+        for (let i = 1; i <= 5; i++) {
+          visiblePages.push(i);
+        }
+        if (totalPages > 6) visiblePages.push(-1); // Ellipsis
+        visiblePages.push(totalPages);
+      } else if (this.currentPage >= totalPages - 3) {
+        // Show first page + last 5 pages
+        visiblePages.push(1);
+        if (totalPages > 6) visiblePages.push(-1); // Ellipsis
+        for (let i = totalPages - 4; i <= totalPages; i++) {
+          visiblePages.push(i);
+        }
+      } else {
+        // Show first page + current page group + last page
+        visiblePages.push(1);
+        visiblePages.push(-1); // Ellipsis
+        for (let i = this.currentPage - 1; i <= this.currentPage + 1; i++) {
+          visiblePages.push(i);
+        }
+        visiblePages.push(-1); // Ellipsis
+        visiblePages.push(totalPages);
+      }
+    }
+    
+    return visiblePages;
   }
+
+  onPageSizeChange(): void {
+    this.currentPage = 1; // Reset to first page
+    this.applyFiltersAndSort();
+  }
+
 }

@@ -20,11 +20,8 @@ export class Sidebar {
   menuItems: MenuItem[] = [
     { title: 'Dashboard', icon: '📊', route: '/dashboard' },
     { title: 'Code Generator', icon: '⚙️', route: '/generator' },
-    { title: 'Templates', icon: '📄', route: '/templates' },
-    { title: 'Projects', icon: '📁', route: '/projects' },
     { title: 'Products', icon: '📦', route: '/products' },
-    { title: 'Settings', icon: '⚙️', route: '/settings' },
-    { title: 'Help & Support', icon: '❓', route: '/help' }
+    { title: 'Settings', icon: '⚙️', route: '/settings' }
   ];
 
   constructor() {}
