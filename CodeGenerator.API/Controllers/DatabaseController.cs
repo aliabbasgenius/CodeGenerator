@@ -113,5 +113,32 @@ namespace CodeGenerator.API.Controllers
                 });
             }
         }
+
+        /// <summary>
+        /// Clean up generated files
+        /// </summary>
+        [HttpPost("cleanup-files")]
+        public async Task<ActionResult<CleanupResult>> CleanupFiles([FromBody] CleanupRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("Starting cleanup of generated files");
+
+                var result = await _codeGenerationService.CleanupGeneratedFilesAsync(request);
+                
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cleaning up generated files");
+                return StatusCode(500, new CleanupResult
+                { 
+                    Success = false, 
+                    Message = "Cleanup failed", 
+                    Errors = new List<string> { ex.Message },
+                    DeletedFiles = new List<string>()
+                });
+            }
+        }
     }
 }

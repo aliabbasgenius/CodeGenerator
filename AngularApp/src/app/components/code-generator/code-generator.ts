@@ -22,12 +22,14 @@ export class CodeGenerator implements OnInit, OnDestroy {
   selectedTables: string[] = [];
   isGenerating = false;
   generationResult: string = '';
+  isCleaningUp = false;
+  cleanupResult: string = '';
   
   // Generation options
   generateAngularCode = true;
   generateApiCode = false;
   outputPath = './generated';
-  angularPath = '../AngularApp/src/app';
+  angularPath = 'd:/Study/Projects/CodeGenerator/AngularApp/src/app';
 
   private subscription: Subscription = new Subscription();
 
@@ -182,5 +184,41 @@ export class CodeGenerator implements OnInit, OnDestroy {
 
   getPrimaryKeyColumns(table: DatabaseTable): string {
     return table.columns.filter(col => col.isPrimaryKey).map(col => col.columnName).join(', ') || 'None';
+  }
+
+  cleanupGeneratedFiles(): void {
+    if (!confirm('Are you sure you want to delete all generated files? This action cannot be undone.')) {
+      return;
+    }
+
+    this.isCleaningUp = true;
+    this.cleanupResult = 'Starting cleanup...';
+
+    const request = {
+      angularPath: this.angularPath
+    };
+
+    this.subscription.add(
+      this.databaseService.cleanupGeneratedFiles(request).subscribe({
+        next: (result) => {
+          this.isCleaningUp = false;
+          if (result.success) {
+            this.cleanupResult = `Cleanup completed successfully!\n\nDeleted Files:\n${result.deletedFiles.map(f => `• ${f.split('/').pop()}`).join('\n')}`;
+          } else {
+            this.cleanupResult = `Cleanup completed with errors:\n${result.errors.join('\n')}`;
+          }
+        },
+        error: (error) => {
+          console.error('Cleanup failed:', error);
+          this.isCleaningUp = false;
+          this.cleanupResult = 'Cleanup failed: ' + (error.error?.message || error.message);
+        }
+      })
+    );
+  }
+
+  clearResults(): void {
+    this.generationResult = '';
+    this.cleanupResult = '';
   }
 }

@@ -81,4 +81,18 @@ namespace CodeGenerator.API.Models
         public List<GeneratedFile> GeneratedFiles { get; set; } = new List<GeneratedFile>();
         public List<string> Errors { get; set; } = new List<string>();
     }
+
+    public class CleanupRequest
+    {
+        [Required]
+        public string AngularPath { get; set; } = string.Empty;
+    }
+
+    public class CleanupResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public List<string> DeletedFiles { get; set; } = new List<string>();
+        public List<string> Errors { get; set; } = new List<string>();
+    }
 }

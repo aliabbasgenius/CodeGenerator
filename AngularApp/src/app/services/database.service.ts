@@ -45,6 +45,17 @@ export interface GeneratedFile {
   content: string;
 }
 
+export interface CleanupRequest {
+  angularPath: string;
+}
+
+export interface CleanupResult {
+  success: boolean;
+  message: string;
+  deletedFiles: string[];
+  errors: string[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -67,5 +78,9 @@ export class DatabaseService {
 
   generateCode(request: DatabaseCodeGenerationRequest): Observable<DatabaseCodeGenerationResult> {
     return this.http.post<DatabaseCodeGenerationResult>(`${this.apiUrl}/generate-code`, request);
+  }
+
+  cleanupGeneratedFiles(request: CleanupRequest): Observable<CleanupResult> {
+    return this.http.post<CleanupResult>(`${this.apiUrl}/cleanup-files`, request);
   }
 }

@@ -111,35 +111,80 @@
           </div>
         </div>
 
-        <!-- Generate Button -->
-        <div class="action-section" *ngIf="isConnected && selectedTables.length > 0">
-          <button 
-            type="button" 
-            class="btn btn-primary btn-large"
-            (click)="generateCode()"
-            [disabled]="isGenerating || selectedTables.length === 0">
-            <span *ngIf="!isGenerating">Generate Code for {{ getSelectedCount() }} Table(s)</span>
-            <span *ngIf="isGenerating">
-              <i class="icon-loading"></i>
-              Generating Code...
-            </span>
-          </button>
+        <!-- Action Buttons -->
+        <div class="action-section" *ngIf="isConnected">
+          <div class="action-buttons">
+            <button 
+              type="button" 
+              class="btn btn-primary btn-large"
+              (click)="generateCode()"
+              [disabled]="isGenerating || selectedTables.length === 0 || isCleaningUp"
+              *ngIf="selectedTables.length > 0">
+              <span *ngIf="!isGenerating">Generate Code for {{ getSelectedCount() }} Table(s)</span>
+              <span *ngIf="isGenerating">
+                <i class="icon-loading"></i>
+                Generating Code...
+              </span>
+            </button>
+
+            <button 
+              type="button" 
+              class="btn btn-danger btn-large"
+              (click)="cleanupGeneratedFiles()"
+              [disabled]="isGenerating || isCleaningUp">
+              <span *ngIf="!isCleaningUp">Clean Up Generated Files</span>
+              <span *ngIf="isCleaningUp">
+                <i class="icon-loading"></i>
+                Cleaning Up...
+              </span>
+            </button>
+
+            <button 
+              type="button" 
+              class="btn btn-secondary"
+              (click)="clearResults()"
+              *ngIf="generationResult || cleanupResult">
+              Clear Results
+            </button>
+          </div>
         </div>
 
-        <!-- Generation Result -->
-        <div class="generation-result" *ngIf="generationResult">
-          <div class="result-card" [ngClass]="{
-            'result-success': !isGenerating && generationResult.includes('completed'),
-            'result-processing': isGenerating
-          }">
-            <div class="result-header">
-              <i class="icon" [ngClass]="{
-                'icon-success': !isGenerating && generationResult.includes('completed'),
-                'icon-loading': isGenerating
-              }"></i>
-              <span>{{ isGenerating ? 'Code Generation in Progress' : 'Generation Complete' }}</span>
+        <!-- Results Section -->
+        <div class="results-section">
+          <!-- Generation Result -->
+          <div class="generation-result" *ngIf="generationResult">
+            <div class="result-card" [ngClass]="{
+              'result-success': !isGenerating && generationResult.includes('completed'),
+              'result-processing': isGenerating
+            }">
+              <div class="result-header">
+                <i class="icon" [ngClass]="{
+                  'icon-success': !isGenerating && generationResult.includes('completed'),
+                  'icon-loading': isGenerating
+                }"></i>
+                <span>{{ isGenerating ? 'Code Generation in Progress' : 'Generation Complete' }}</span>
+              </div>
+              <p>{{ generationResult }}</p>
             </div>
-            <p>{{ generationResult }}</p>
+          </div>
+
+          <!-- Cleanup Result -->
+          <div class="cleanup-result" *ngIf="cleanupResult">
+            <div class="result-card" [ngClass]="{
+              'result-success': !isCleaningUp && cleanupResult.includes('successfully'),
+              'result-processing': isCleaningUp,
+              'result-error': !isCleaningUp && cleanupResult.includes('failed')
+            }">
+              <div class="result-header">
+                <i class="icon" [ngClass]="{
+                  'icon-success': !isCleaningUp && cleanupResult.includes('successfully'),
+                  'icon-loading': isCleaningUp,
+                  'icon-error': !isCleaningUp && cleanupResult.includes('failed')
+                }"></i>
+                <span>{{ isCleaningUp ? 'Cleanup in Progress' : 'Cleanup Complete' }}</span>
+              </div>
+              <p>{{ cleanupResult }}</p>
+            </div>
           </div>
         </div>
       </div>

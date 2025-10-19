@@ -1,11 +1,13 @@
 using CodeGenerator.API.Models;
 using CodeGenerator.API.Services;
+using System.IO;
 
 namespace CodeGenerator.API.Services
 {
     public interface IDatabaseCodeGenerationService
     {
         Task<DatabaseCodeGenerationResult> GenerateCodeAsync(DatabaseCodeGenerationRequest request);
+        Task<CleanupResult> CleanupGeneratedFilesAsync(CleanupRequest request);
     }
 
     public class DatabaseCodeGenerationService : IDatabaseCodeGenerationService
@@ -62,6 +64,13 @@ namespace CodeGenerator.API.Services
                         if (request.GenerateAngularCode)
                         {
                             var angularFiles = GenerateAngularFiles(table, request.AngularPath);
+                            
+                            // Write Angular files to disk
+                            foreach (var file in angularFiles)
+                            {
+                                await WriteFileToDiskAsync(file);
+                            }
+                            
                             generatedFiles.AddRange(angularFiles);
                         }
 
@@ -195,6 +204,184 @@ namespace CodeGenerator.API.Services
             }
 
             return files;
+        }
+
+        private async Task WriteFileToDiskAsync(GeneratedFile file)
+        {
+            try
+            {
+                // Ensure the directory exists
+                var directory = Path.GetDirectoryName(file.FilePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                    _logger.LogInformation("Created directory: {Directory}", directory);
+                }
+
+                // Write the file content
+                await File.WriteAllTextAsync(file.FilePath, file.Content);
+                _logger.LogInformation("Successfully wrote file: {FilePath}", file.FilePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to write file: {FilePath}", file.FilePath);
+                throw;
+            }
+        }
+
+        public async Task<CleanupResult> CleanupGeneratedFilesAsync(CleanupRequest request)
+        {
+            var result = new CleanupResult
+            {
+                Success = false,
+                DeletedFiles = new List<string>(),
+                Errors = new List<string>()
+            };
+
+            try
+            {
+                _logger.LogInformation("Starting cleanup of generated files in {AngularPath}", request.AngularPath);
+
+                var deletedFiles = new List<string>();
+                var errors = new List<string>();
+
+                // Define the directories to clean
+                var directoriesToClean = new[]
+                {
+                    Path.Combine(request.AngularPath, "models"),
+                    Path.Combine(request.AngularPath, "services"), 
+                    Path.Combine(request.AngularPath, "components")
+                };
+
+                foreach (var directory in directoriesToClean)
+                {
+                    if (Directory.Exists(directory))
+                    {
+                        try
+                        {
+                            if (directory.EndsWith("components"))
+                            {
+                                // For components directory, only delete generated component folders (not existing ones like product-list, etc.)
+                                await CleanupGeneratedComponentsAsync(directory, deletedFiles, errors);
+                            }
+                            else
+                            {
+                                // For models and services, delete generated files but keep existing ones
+                                await CleanupGeneratedFilesInDirectoryAsync(directory, deletedFiles, errors);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            var errorMsg = $"Error cleaning directory {directory}: {ex.Message}";
+                            errors.Add(errorMsg);
+                            _logger.LogError(ex, "Error cleaning directory {Directory}", directory);
+                        }
+                    }
+                }
+
+                result.Success = errors.Count == 0;
+                result.DeletedFiles = deletedFiles;
+                result.Errors = errors;
+                result.Message = result.Success 
+                    ? $"Successfully deleted {deletedFiles.Count} files"
+                    : $"Cleanup completed with {errors.Count} errors";
+
+                _logger.LogInformation("Cleanup completed. Deleted {FileCount} files with {ErrorCount} errors", 
+                    deletedFiles.Count, errors.Count);
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.Message = $"Cleanup failed: {ex.Message}";
+                result.Errors.Add(ex.Message);
+                _logger.LogError(ex, "Critical error during cleanup");
+            }
+
+            return result;
+        }
+
+        private async Task CleanupGeneratedComponentsAsync(string componentsDirectory, List<string> deletedFiles, List<string> errors)
+        {
+            var directories = Directory.GetDirectories(componentsDirectory);
+            
+            foreach (var dir in directories)
+            {
+                var dirName = Path.GetFileName(dir);
+                
+                // Only delete directories that match generated patterns (exclude existing ones like product-list, product-form, etc.)
+                if (IsGeneratedComponentDirectory(dirName))
+                {
+                    try
+                    {
+                        var files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories);
+                        foreach (var file in files)
+                        {
+                            File.Delete(file);
+                            deletedFiles.Add(file);
+                        }
+                        Directory.Delete(dir, true);
+                        _logger.LogInformation("Deleted generated component directory: {Directory}", dir);
+                    }
+                    catch (Exception ex)
+                    {
+                        errors.Add($"Failed to delete component directory {dir}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        private async Task CleanupGeneratedFilesInDirectoryAsync(string directory, List<string> deletedFiles, List<string> errors)
+        {
+            var files = Directory.GetFiles(directory);
+            
+            foreach (var file in files)
+            {
+                var fileName = Path.GetFileName(file);
+                
+                // Only delete files that match generated patterns (exclude existing ones like product.model.ts, product.service.ts, etc.)
+                if (IsGeneratedFile(fileName))
+                {
+                    try
+                    {
+                        File.Delete(file);
+                        deletedFiles.Add(file);
+                        _logger.LogInformation("Deleted generated file: {File}", file);
+                    }
+                    catch (Exception ex)
+                    {
+                        errors.Add($"Failed to delete file {file}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        private static bool IsGeneratedComponentDirectory(string dirName)
+        {
+            // Skip existing components (product-list, product-form, dashboard, login, etc.)
+            var existingComponents = new[] { "product-list", "product-form", "dashboard", "login", "header", "sidebar", "footer", "code-generator" };
+            
+            if (existingComponents.Contains(dirName.ToLowerInvariant()))
+            {
+                return false;
+            }
+
+            // Consider it generated if it follows the pattern: tablename-list or tablename-form
+            return dirName.EndsWith("-list") || dirName.EndsWith("-form");
+        }
+
+        private static bool IsGeneratedFile(string fileName)
+        {
+            // Skip existing files (product.model.ts, product.service.ts, database.service.ts, etc.)
+            var existingFiles = new[] { "product.model.ts", "product.service.ts", "database.service.ts" };
+            
+            if (existingFiles.Contains(fileName.ToLowerInvariant()))
+            {
+                return false;
+            }
+
+            // Consider it generated if it matches typical generated patterns but isn't in the existing files list
+            return (fileName.EndsWith(".model.ts") || fileName.EndsWith(".service.ts")) && 
+                   !existingFiles.Contains(fileName.ToLowerInvariant());
         }
 
         private static string ToPascalCase(string input)
