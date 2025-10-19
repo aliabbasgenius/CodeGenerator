@@ -1,0 +1,150 @@
+<div class="page-layout">
+  <app-header></app-header>
+  
+  <div class="content-wrapper">
+    <app-sidebar></app-sidebar>
+    
+    <main class="main-content">
+      <div class="code-generator-container">
+        <div class="header-section">
+          <h1>Database Code Generator</h1>
+          <p>Generate Angular CRUD components from your database tables</p>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="connection-status" [ngClass]="{
+          'status-success': isConnected,
+          'status-error': !isConnected && connectionStatus && !isLoading,
+          'status-loading': isLoading
+        }">
+          <div class="status-indicator">
+            <i class="icon" [ngClass]="{
+              'icon-success': isConnected,
+              'icon-error': !isConnected && connectionStatus && !isLoading,
+              'icon-loading': isLoading
+            }"></i>
+            <span>{{ connectionStatus || 'Not connected' }}</span>
+          </div>
+          <button 
+            type="button" 
+            class="btn btn-secondary btn-sm" 
+            (click)="testConnection()"
+            [disabled]="isLoading">
+            {{ isLoading ? 'Testing...' : 'Test Connection' }}
+          </button>
+        </div>
+
+        <!-- Tables Section -->
+        <div class="tables-section" *ngIf="isConnected">
+          <div class="section-header">
+            <h2>Select Tables for Code Generation</h2>
+            <div class="table-actions">
+              <span class="selection-count">{{ getSelectedCount() }} of {{ tables.length }} tables selected</span>
+              <button type="button" class="btn btn-outline btn-sm" (click)="selectAll()">Select All</button>
+              <button type="button" class="btn btn-outline btn-sm" (click)="deselectAll()">Deselect All</button>
+            </div>
+          </div>
+
+          <div class="tables-grid" *ngIf="tables.length > 0">
+            <div class="table-card" *ngFor="let table of tables">
+              <div class="table-header">
+                <label class="checkbox-label">
+                  <input 
+                    type="checkbox" 
+                    [(ngModel)]="table.isSelected"
+                    (change)="onTableSelectionChange(table)">
+                  <span class="checkmark"></span>
+                  <span class="table-name">{{ table.schema }}.{{ table.tableName }}</span>
+                </label>
+              </div>
+              
+              <div class="table-details">
+                <div class="detail-row">
+                  <strong>Columns ({{ table.columns.length }}):</strong>
+                  <span class="columns-list">{{ getTableColumns(table) }}</span>
+                </div>
+                <div class="detail-row">
+                  <strong>Primary Keys:</strong>
+                  <span class="primary-keys">{{ getPrimaryKeyColumns(table) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-state" *ngIf="tables.length === 0 && !isLoading">
+            <i class="icon-database"></i>
+            <h3>No Tables Found</h3>
+            <p>No tables were found in the connected database.</p>
+          </div>
+        </div>
+
+        <!-- Generation Options -->
+        <div class="generation-options" *ngIf="isConnected && selectedTables.length > 0">
+          <h3>Code Generation Options</h3>
+          
+          <div class="options-grid">
+            <div class="option-group">
+              <h4>What to Generate</h4>
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="generateAngularCode">
+                <span class="checkmark"></span>
+                <span>Angular Components & Services</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="generateApiCode">
+                <span class="checkmark"></span>
+                <span>API Controllers (C#)</span>
+              </label>
+            </div>
+
+            <div class="option-group">
+              <h4>Output Settings</h4>
+              <div class="input-group">
+                <label>Output Path:</label>
+                <input type="text" [(ngModel)]="outputPath" class="form-input">
+              </div>
+              <div class="input-group">
+                <label>Angular Path:</label>
+                <input type="text" [(ngModel)]="angularPath" class="form-input">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Generate Button -->
+        <div class="action-section" *ngIf="isConnected && selectedTables.length > 0">
+          <button 
+            type="button" 
+            class="btn btn-primary btn-large"
+            (click)="generateCode()"
+            [disabled]="isGenerating || selectedTables.length === 0">
+            <span *ngIf="!isGenerating">Generate Code for {{ getSelectedCount() }} Table(s)</span>
+            <span *ngIf="isGenerating">
+              <i class="icon-loading"></i>
+              Generating Code...
+            </span>
+          </button>
+        </div>
+
+        <!-- Generation Result -->
+        <div class="generation-result" *ngIf="generationResult">
+          <div class="result-card" [ngClass]="{
+            'result-success': !isGenerating && generationResult.includes('completed'),
+            'result-processing': isGenerating
+          }">
+            <div class="result-header">
+              <i class="icon" [ngClass]="{
+                'icon-success': !isGenerating && generationResult.includes('completed'),
+                'icon-loading': isGenerating
+              }"></i>
+              <span>{{ isGenerating ? 'Code Generation in Progress' : 'Generation Complete' }}</span>
+            </div>
+            <p>{{ generationResult }}</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  
+  <app-footer></app-footer>
+</div>

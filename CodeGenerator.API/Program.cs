@@ -22,6 +22,9 @@ builder.Services.AddSwaggerGen(c =>
 
 // Register services
 builder.Services.AddScoped<ICodeGenerationService, CodeGenerationService>();
+builder.Services.AddScoped<IDatabaseDiscoveryService, DatabaseDiscoveryService>();
+builder.Services.AddScoped<IAngularCodeGenerationService, AngularCodeGenerationService>();
+builder.Services.AddScoped<IDatabaseCodeGenerationService, DatabaseCodeGenerationService>();
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -65,6 +68,8 @@ app.MapGet("/", () => new
         "/api/codegenerator/generate-from-template",
         "/api/codegenerator/templates",
         "/api/codegenerator/supported-technologies",
+        "/api/database/test-connection",
+        "/api/database/tables",
         "/swagger"
     }
 });
