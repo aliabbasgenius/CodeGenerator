@@ -22,6 +22,7 @@ export class Sidebar {
     { title: 'Code Generator', icon: '⚙️', route: '/generator' },
     { title: 'Templates', icon: '📄', route: '/templates' },
     { title: 'Projects', icon: '📁', route: '/projects' },
+    { title: 'Products', icon: '📦', route: '/products' },
     { title: 'Settings', icon: '⚙️', route: '/settings' },
     { title: 'Help & Support', icon: '❓', route: '/help' }
   ];
@@ -29,8 +30,8 @@ export class Sidebar {
   constructor() {}
 
   setActiveItem(clickedItem: MenuItem): void {
-    this.menuItems.forEach(item => {
+    for (const item of this.menuItems) {
       item.isActive = item === clickedItem;
-    });
+    }
   }
 }

@@ -1,0 +1,203 @@
+<div class="product-list-container">
+  <!-- Header Section -->
+  <div class="page-header">
+    <div class="header-content">
+      <div class="title-section">
+        <h1>Product Management</h1>
+        <p>Manage your product inventory with ease</p>
+      </div>
+      <button class="btn-add-product" (click)="addProduct()">
+        <span class="icon">➕</span>
+        Add New Product
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters and Search Section -->
+  <div class="filters-section">
+    <div class="search-container">
+      <div class="search-box">
+        <input 
+          type="text" 
+          [(ngModel)]="searchTerm"
+          (input)="onSearch()"
+          placeholder="Search products by name..."
+          class="search-input"
+        >
+        <span class="search-icon">🔍</span>
+      </div>
+    </div>
+
+    <div class="filter-container">
+      <select 
+        [(ngModel)]="selectedCategory"
+        (change)="onCategoryChange()"
+        class="category-filter"
+      >
+        <option *ngFor="let category of categories" [value]="category === 'All' ? '' : category">
+          {{ category }}
+        </option>
+      </select>
+    </div>
+
+    <div class="results-info">
+      <span>Showing {{ getPaginatedProducts().length }} of {{ totalItems }} products</span>
+    </div>
+  </div>
+
+  <!-- Products Table -->
+  <div class="table-container">
+    <table class="products-table">
+      <thead>
+        <tr>
+          <th (click)="sortBy('productId')" class="sortable">
+            ID {{ getSortIcon('productId') }}
+          </th>
+          <th (click)="sortBy('name')" class="sortable">
+            Product Name {{ getSortIcon('name') }}
+          </th>
+          <th (click)="sortBy('category')" class="sortable">
+            Category {{ getSortIcon('category') }}
+          </th>
+          <th (click)="sortBy('price')" class="sortable">
+            Price {{ getSortIcon('price') }}
+          </th>
+          <th (click)="sortBy('stockQuantity')" class="sortable">
+            Stock {{ getSortIcon('stockQuantity') }}
+          </th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr 
+          *ngFor="let product of getPaginatedProducts()" 
+          class="product-row"
+          [class.low-stock]="product.stockQuantity < 10"
+          [class.out-of-stock]="product.stockQuantity === 0"
+        >
+          <td class="product-id">{{ product.productId }}</td>
+          <td class="product-name">
+            <div class="name-content">
+              <strong>{{ product.name }}</strong>
+            </div>
+          </td>
+          <td class="category">
+            <span class="category-badge">{{ product.category }}</span>
+          </td>
+          <td class="price">{{ formatCurrency(product.price) }}</td>
+          <td class="stock">{{ product.stockQuantity }}</td>
+          <td class="status">
+            <span 
+              class="status-badge" 
+              [class]="getStockStatus(product.stockQuantity)"
+            >
+              {{ getStockStatusText(product.stockQuantity) }}
+            </span>
+          </td>
+          <td class="actions">
+            <button 
+              class="btn-action btn-edit" 
+              (click)="editProduct(product)"
+              title="Edit Product"
+            >
+              ✏️
+            </button>
+            <button 
+              class="btn-action btn-delete" 
+              (click)="deleteProduct(product)"
+              title="Delete Product"
+            >
+              🗑️
+            </button>
+          </td>
+        </tr>
+        
+        <!-- Empty State -->
+        <tr *ngIf="getPaginatedProducts().length === 0" class="empty-state">
+          <td colspan="7" class="empty-message">
+            <div class="empty-content">
+              <span class="empty-icon">📦</span>
+              <h3>No products found</h3>
+              <p *ngIf="searchTerm || selectedCategory; else noProductsMessage">
+                Try adjusting your search criteria or filters.
+              </p>
+              <ng-template #noProductsMessage>
+                <p>Start by adding your first product to the inventory.</p>
+                <button class="btn-add-first" (click)="addProduct()">
+                  Add Your First Product
+                </button>
+              </ng-template>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination-container" *ngIf="getTotalPages() > 1">
+    <div class="pagination-info">
+      <span>
+        Page {{ currentPage }} of {{ getTotalPages() }} 
+        ({{ totalItems }} total items)
+      </span>
+    </div>
+    
+    <div class="pagination-controls">
+      <button 
+        class="btn-page" 
+        (click)="previousPage()" 
+        [disabled]="currentPage === 1"
+      >
+        ← Previous
+      </button>
+      
+      <button 
+        *ngFor="let page of [].constructor(getTotalPages()); let i = index"
+        class="btn-page"
+        [class.active]="currentPage === i + 1"
+        (click)="goToPage(i + 1)"
+      >
+        {{ i + 1 }}
+      </button>
+      
+      <button 
+        class="btn-page" 
+        (click)="nextPage()" 
+        [disabled]="currentPage === getTotalPages()"
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary Section -->
+  <div class="summary-section">
+    <div class="summary-cards">
+      <div class="summary-card">
+        <span class="card-icon">📊</span>
+        <div class="card-content">
+          <h4>Total Products</h4>
+          <p class="card-value">{{ products.length }}</p>
+        </div>
+      </div>
+      
+      <div class="summary-card">
+        <span class="card-icon">📂</span>
+        <div class="card-content">
+          <h4>Categories</h4>
+          <p class="card-value">{{ getCategoriesCount() }}</p>
+        </div>
+      </div>
+      
+      <div class="summary-card">
+        <span class="card-icon">⚠️</span>
+        <div class="card-content">
+          <h4>Low Stock</h4>
+          <p class="card-value">{{ getLowStockCount() }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

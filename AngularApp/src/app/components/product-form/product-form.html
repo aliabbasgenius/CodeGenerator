@@ -1,0 +1,157 @@
+<div class="product-form-container">
+  <!-- Header -->
+  <div class="form-header">
+    <h1>{{ isEditMode ? 'Edit Product' : 'Add New Product' }}</h1>
+    <p>{{ isEditMode ? 'Update product information below' : 'Fill in the details to create a new product' }}</p>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="loading-spinner"></div>
+    <p>{{ isEditMode ? 'Loading product...' : 'Saving product...' }}</p>
+  </div>
+
+  <!-- Error Message -->
+  <div *ngIf="error" class="error-message">
+    <span class="error-icon">⚠️</span>
+    {{ error }}
+  </div>
+
+  <!-- Form -->
+  <form [formGroup]="productForm" (ngSubmit)="onSubmit()" class="product-form" *ngIf="!isLoading">
+    <!-- Product Name -->
+    <div class="form-group">
+      <label for="name" class="form-label">
+        Product Name <span class="required">*</span>
+      </label>
+      <input
+        id="name"
+        type="text"
+        formControlName="name"
+        class="form-input"
+        [class.error]="isFieldInvalid('name')"
+        placeholder="Enter product name"
+        autocomplete="off"
+      />
+      <div class="error-text" *ngIf="isFieldInvalid('name')">
+        {{ getFieldError('name') }}
+      </div>
+    </div>
+
+    <!-- Category -->
+    <div class="form-group">
+      <label for="category" class="form-label">
+        Category <span class="required">*</span>
+      </label>
+      <select
+        id="category"
+        formControlName="category"
+        class="form-select"
+        [class.error]="isFieldInvalid('category')"
+      >
+        <option value="">Select a category</option>
+        <option *ngFor="let category of categories" [value]="category">
+          {{ category }}
+        </option>
+      </select>
+      <div class="error-text" *ngIf="isFieldInvalid('category')">
+        {{ getFieldError('category') }}
+      </div>
+    </div>
+
+    <!-- Price and Stock Quantity Row -->
+    <div class="form-row">
+      <!-- Price -->
+      <div class="form-group">
+        <label for="price" class="form-label">
+          Price <span class="required">*</span>
+        </label>
+        <div class="input-with-prefix">
+          <span class="input-prefix">$</span>
+          <input
+            id="price"
+            type="number"
+            formControlName="price"
+            class="form-input with-prefix"
+            [class.error]="isFieldInvalid('price')"
+            placeholder="0.00"
+            step="0.01"
+            min="0.01"
+          />
+        </div>
+        <div class="error-text" *ngIf="isFieldInvalid('price')">
+          {{ getFieldError('price') }}
+        </div>
+      </div>
+
+      <!-- Stock Quantity -->
+      <div class="form-group">
+        <label for="stockQuantity" class="form-label">
+          Stock Quantity <span class="required">*</span>
+        </label>
+        <input
+          id="stockQuantity"
+          type="number"
+          formControlName="stockQuantity"
+          class="form-input"
+          [class.error]="isFieldInvalid('stockQuantity')"
+          placeholder="0"
+          min="0"
+        />
+        <div class="error-text" *ngIf="isFieldInvalid('stockQuantity')">
+          {{ getFieldError('stockQuantity') }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="form-actions">
+      <button
+        type="button"
+        class="btn btn-cancel"
+        (click)="onCancel()"
+        [disabled]="isLoading"
+      >
+        Cancel
+      </button>
+      
+      <button
+        type="submit"
+        class="btn btn-primary"
+        [disabled]="productForm.invalid || isLoading"
+      >
+        <span *ngIf="!isLoading">
+          {{ isEditMode ? 'Update Product' : 'Create Product' }}
+        </span>
+        <span *ngIf="isLoading" class="loading-text">
+          <span class="spinner"></span>
+          {{ isEditMode ? 'Updating...' : 'Creating...' }}
+        </span>
+      </button>
+    </div>
+  </form>
+
+  <!-- Form Preview (for edit mode) -->
+  <div *ngIf="isEditMode && product && !isLoading" class="form-preview">
+    <h3>Current Product Information</h3>
+    <div class="preview-card">
+      <div class="preview-item">
+        <strong>ID:</strong> {{ product.productId }}
+      </div>
+      <div class="preview-item">
+        <strong>Name:</strong> {{ product.name }}
+      </div>
+      <div class="preview-item">
+        <strong>Category:</strong> 
+        <span class="category-badge">{{ product.category }}</span>
+      </div>
+      <div class="preview-item">
+        <strong>Price:</strong> 
+        <span class="price">${{ product.price | number:'1.2-2' }}</span>
+      </div>
+      <div class="preview-item">
+        <strong>Stock:</strong> {{ product.stockQuantity }} units
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { Login } from './components/login/login';
 import { Dashboard } from './components/dashboard/dashboard';
+import { ProductList } from './components/product-list/product-list';
+import { ProductForm } from './components/product-form/product-form';
 import { authGuard } from './guards/auth-guard';
 
 export const routes: Routes = [
@@ -10,6 +12,9 @@ export const routes: Routes = [
   { path: 'generator', component: Dashboard, canActivate: [authGuard] },
   { path: 'templates', component: Dashboard, canActivate: [authGuard] },
   { path: 'projects', component: Dashboard, canActivate: [authGuard] },
+  { path: 'products', component: ProductList, canActivate: [authGuard] },
+  { path: 'products/new', component: ProductForm },
+  { path: 'products/edit/:id', component: ProductForm },
   { path: 'settings', component: Dashboard, canActivate: [authGuard] },
   { path: 'help', component: Dashboard, canActivate: [authGuard] },
   { path: '**', redirectTo: '/dashboard' } // Wildcard route for 404 errors
