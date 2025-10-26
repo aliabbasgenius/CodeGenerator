@@ -1,5 +1,6 @@
 using CodeGenerator.API.Models;
 using CodeGenerator.API.Services;
+using System.Collections.Generic;
 using System.IO;
 
 namespace CodeGenerator.API.Services
@@ -359,6 +360,7 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
 
                 var deletedFiles = new List<string>();
                 var errors = new List<string>();
+                var generatedTableNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 // Define the directories to clean
                 var directoriesToClean = new[]
@@ -377,7 +379,7 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
                             if (directory.EndsWith("components"))
                             {
                                 // For components directory, only delete generated component folders (not existing ones like product-list, etc.)
-                                await CleanupGeneratedComponentsAsync(directory, deletedFiles, errors);
+                                await CleanupGeneratedComponentsAsync(directory, generatedTableNames, deletedFiles, errors);
                             }
                             else
                             {
@@ -395,7 +397,7 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
                 }
 
                 // Cleanup navigation entries for generated components
-                await CleanupNavigationEntriesAsync(request.AngularPath, deletedFiles, errors);
+                await CleanupNavigationEntriesAsync(generatedTableNames, request.AngularPath, errors);
 
                 result.Success = errors.Count == 0;
                 result.DeletedFiles = deletedFiles;
@@ -418,34 +420,12 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
             return result;
         }
 
-        private async Task CleanupNavigationEntriesAsync(string angularPath, List<string> deletedFiles, List<string> errors)
+        private async Task CleanupNavigationEntriesAsync(HashSet<string> tableNames, string angularPath, List<string> errors)
         {
             try
             {
-                // Get list of generated table names from the components that were deleted
-                var componentsDirectory = Path.Combine(angularPath, "components");
-                if (!Directory.Exists(componentsDirectory))
-                    return;
-
-                var generatedTableNames = new List<string>();
-                var directories = Directory.GetDirectories(componentsDirectory);
-                
-                foreach (var dir in directories)
-                {
-                    var dirName = Path.GetFileName(dir);
-                    if (IsGeneratedComponentDirectory(dirName))
-                    {
-                        // Extract table name from component directory name
-                        var tableName = ExtractTableNameFromComponentDirectory(dirName);
-                        if (!string.IsNullOrEmpty(tableName) && !generatedTableNames.Contains(tableName))
-                        {
-                            generatedTableNames.Add(tableName);
-                        }
-                    }
-                }
-
                 // Remove navigation entries for each generated table
-                foreach (var tableName in generatedTableNames)
+                foreach (var tableName in tableNames)
                 {
                     try
                     {
@@ -466,25 +446,20 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
             }
         }
 
-        private string ExtractTableNameFromComponentDirectory(string directoryName)
+        private static string ExtractTableNameFromComponentDirectory(string directoryName)
         {
             // Convert component directory name back to table name
             // e.g., "authors-list" -> "Authors", "book-categories-form" -> "BookCategories"
-            if (directoryName.EndsWith("-list"))
+            if (directoryName.EndsWith("-list") || directoryName.EndsWith("-form"))
             {
-                var baseName = directoryName.Substring(0, directoryName.Length - 5); // Remove "-list"
+                var baseName = directoryName.Substring(0, directoryName.Length - 5);
                 return ToPascalCase(baseName.Replace("-", ""));
             }
-            else if (directoryName.EndsWith("-form"))
-            {
-                var baseName = directoryName.Substring(0, directoryName.Length - 5); // Remove "-form"
-                return ToPascalCase(baseName.Replace("-", ""));
-            }
-            
+
             return string.Empty;
         }
 
-        private async Task CleanupGeneratedComponentsAsync(string componentsDirectory, List<string> deletedFiles, List<string> errors)
+        private async Task CleanupGeneratedComponentsAsync(string componentsDirectory, HashSet<string> tableNames, List<string> deletedFiles, List<string> errors)
         {
             var directories = Directory.GetDirectories(componentsDirectory);
             
@@ -497,6 +472,12 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
                 {
                     try
                     {
+                        var tableName = ExtractTableNameFromComponentDirectory(dirName);
+                        if (!string.IsNullOrEmpty(tableName))
+                        {
+                            tableNames.Add(tableName);
+                        }
+                        
                         var files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories);
                         foreach (var file in files)
                         {
