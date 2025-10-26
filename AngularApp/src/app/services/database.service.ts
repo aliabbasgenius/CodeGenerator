@@ -29,6 +29,7 @@ export interface DatabaseCodeGenerationRequest {
   generateAngularCode: boolean;
   generateApiCode: boolean;
   angularPath: string;
+  apiControllersPath?: string;
 }
 
 export interface DatabaseCodeGenerationResult {
@@ -47,6 +48,7 @@ export interface GeneratedFile {
 
 export interface CleanupRequest {
   angularPath: string;
+  apiControllersPath?: string;
 }
 
 export interface CleanupResult {
@@ -60,9 +62,9 @@ export interface CleanupResult {
   providedIn: 'root'
 })
 export class DatabaseService {
-  private apiUrl = 'http://localhost:5173/api/database';
+  private readonly apiUrl = 'http://localhost:5173/api/database';
 
-  constructor(private http: HttpClient) {}
+  constructor(private readonly http: HttpClient) {}
 
   testConnection(): Observable<{ success: boolean; message: string }> {
     return this.http.get<{ success: boolean; message: string }>(`${this.apiUrl}/test-connection`);

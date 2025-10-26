@@ -15,19 +15,24 @@ namespace CodeGenerator.API.Services
     {
         private readonly IDatabaseDiscoveryService _databaseService;
         private readonly IAngularCodeGenerationService _angularService;
+        private readonly IApiCodeGenerationService _apiService;
         private readonly NavigationIntegrationService _navigationService;
         private readonly ILogger<DatabaseCodeGenerationService> _logger;
+        private readonly string _projectRootPath;
 
         public DatabaseCodeGenerationService(
             IDatabaseDiscoveryService databaseService,
             IAngularCodeGenerationService angularService,
+            IApiCodeGenerationService apiService,
             NavigationIntegrationService navigationService,
             ILogger<DatabaseCodeGenerationService> logger)
         {
             _databaseService = databaseService;
             _angularService = angularService;
+            _apiService = apiService;
             _navigationService = navigationService;
             _logger = logger;
+            _projectRootPath = ResolveProjectRootPath();
         }
 
         public async Task<DatabaseCodeGenerationResult> GenerateCodeAsync(DatabaseCodeGenerationRequest request)
@@ -47,62 +52,16 @@ namespace CodeGenerator.API.Services
 
                 foreach (var tableFullName in request.SelectedTables)
                 {
-                    try
-                    {
-                        var parts = tableFullName.Split('.');
-                        var schema = parts.Length > 1 ? parts[0] : "dbo";
-                        var tableName = parts.Length > 1 ? parts[1] : parts[0];
-
-                        _logger.LogInformation("Generating code for table: {Schema}.{TableName}", schema, tableName);
-
-                        // Get table schema
-                        var table = await _databaseService.GetTableSchemaAsync(tableName, schema);
-
-                        if (table.Columns == null || !table.Columns.Any())
-                        {
-                            result.Errors.Add($"No columns found for table {schema}.{tableName}");
-                            continue;
-                        }
-
-                        // Generate Angular code if requested
-                        if (request.GenerateAngularCode)
-                        {
-                            var angularFiles = GenerateAngularFiles(table, request.AngularPath);
-                            
-                            // Write Angular files to disk
-                            foreach (var file in angularFiles)
-                            {
-                                await WriteFileToDiskAsync(file);
-                            }
-                            
-                            // Update navigation automatically
-                            await _navigationService.UpdateAppRoutesAsync(table, request.AngularPath);
-                            await _navigationService.UpdateSidebarAsync(table, request.AngularPath);
-                            
-                            generatedFiles.AddRange(angularFiles);
-                        }
-
-                        // Generate API code if requested
-                        if (request.GenerateApiCode)
-                        {
-                            // TODO: Implement API code generation
-                            _logger.LogInformation("API code generation not yet implemented");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error generating code for table {TableName}", tableFullName);
-                        result.Errors.Add($"Error generating code for table {tableFullName}: {ex.Message}");
-                    }
+                    await GenerateCodeForTableAsync(tableFullName, request, generatedFiles, result.Errors);
                 }
 
                 result.GeneratedFiles = generatedFiles;
                 result.Success = result.Errors.Count == 0 || generatedFiles.Any();
-                result.Message = result.Success 
+                result.Message = result.Success
                     ? $"Successfully generated {generatedFiles.Count} files for {request.SelectedTables.Count} table(s)"
                     : "Code generation completed with errors";
 
-                _logger.LogInformation("Code generation completed. Generated {FileCount} files with {ErrorCount} errors", 
+                _logger.LogInformation("Code generation completed. Generated {FileCount} files with {ErrorCount} errors",
                     generatedFiles.Count, result.Errors.Count);
             }
             catch (Exception ex)
@@ -115,212 +74,173 @@ namespace CodeGenerator.API.Services
             return result;
         }
 
+        private async Task GenerateCodeForTableAsync(
+            string tableFullName,
+            DatabaseCodeGenerationRequest request,
+            List<GeneratedFile> generatedFiles,
+            List<string> errors)
+        {
+            try
+            {
+                var (schema, tableName) = ParseTableIdentifier(tableFullName);
+
+                _logger.LogInformation("Generating code for table: {Schema}.{TableName}", schema, tableName);
+
+                var table = await _databaseService.GetTableSchemaAsync(tableName, schema);
+
+                if (table.Columns == null || !table.Columns.Any())
+                {
+                    errors.Add($"No columns found for table {schema}.{tableName}");
+                    return;
+                }
+
+                if (request.GenerateAngularCode)
+                {
+                    var angularFiles = GenerateAngularFiles(table, request.AngularPath);
+
+                    foreach (var file in angularFiles)
+                    {
+                        await WriteFileToDiskAsync(file);
+                    }
+
+                    await _navigationService.UpdateAppRoutesAsync(table, request.AngularPath);
+                    await _navigationService.UpdateSidebarAsync(table, request.AngularPath);
+
+                    generatedFiles.AddRange(angularFiles);
+                }
+
+                if (request.GenerateApiCode)
+                {
+                    var apiFiles = GenerateApiFiles(table, request.ApiControllersPath);
+
+                    foreach (var file in apiFiles)
+                    {
+                        await WriteFileToDiskAsync(file);
+                    }
+
+                    generatedFiles.AddRange(apiFiles);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating code for table {TableName}", tableFullName);
+                errors.Add($"Error generating code for table {tableFullName}: {ex.Message}");
+            }
+        }
+
         private List<GeneratedFile> GenerateAngularFiles(DatabaseTable table, string basePath)
         {
             var files = new List<GeneratedFile>();
-            var className = ToPascalCase(table.TableName);
             var camelCaseName = ToCamelCase(table.TableName);
 
-            try
+            // Generate Model
+            var modelContent = _angularService.GenerateModel(table);
+            files.Add(new GeneratedFile
             {
-                // Generate Model
-                var modelContent = _angularService.GenerateModel(table);
-                files.Add(new GeneratedFile
-                {
-                    FileName = $"{camelCaseName}.model.ts",
-                    FilePath = $"{basePath}/models/{camelCaseName}.model.ts",
-                    FileType = "model",
-                    Content = modelContent
-                });
+                FileName = $"{camelCaseName}.model.ts",
+                FilePath = $"{basePath}/models/{camelCaseName}.model.ts",
+                FileType = "model",
+                Content = modelContent
+            });
 
-                // Generate Service
-                var serviceContent = _angularService.GenerateService(table);
-                files.Add(new GeneratedFile
-                {
-                    FileName = $"{camelCaseName}.service.ts",
-                    FilePath = $"{basePath}/services/{camelCaseName}.service.ts",
-                    FileType = "service",
-                    Content = serviceContent
-                });
-
-                // Generate List Component TypeScript
-                var listComponentContent = _angularService.GenerateListComponent(table);
-                files.Add(new GeneratedFile
-                {
-                    FileName = $"{camelCaseName}-list.ts",
-                    FilePath = $"{basePath}/components/{camelCaseName}-list/{camelCaseName}-list.ts",
-                    FileType = "component",
-                    Content = listComponentContent
-                });
-
-                // Generate List Component HTML
-                var listHtmlContent = _angularService.GenerateListHtml(table);
-                files.Add(new GeneratedFile
-                {
-                    FileName = $"{camelCaseName}-list.html",
-                    FilePath = $"{basePath}/components/{camelCaseName}-list/{camelCaseName}-list.html",
-                    FileType = "template",
-                    Content = listHtmlContent
-                });
-
-                // Generate List Component CSS
-                var listCssContent = _angularService.GenerateListCss(table);
-                files.Add(new GeneratedFile
-                {
-                    FileName = $"{camelCaseName}-list.css",
-                    FilePath = $"{basePath}/components/{camelCaseName}-list/{camelCaseName}-list.css",
-                    FileType = "stylesheet",
-                    Content = listCssContent
-                });
-
-                // Generate Form Component TypeScript
-                var formComponentContent = _angularService.GenerateFormComponent(table);
-                files.Add(new GeneratedFile
-                {
-                    FileName = $"{camelCaseName}-form.ts",
-                    FilePath = $"{basePath}/components/{camelCaseName}-form/{camelCaseName}-form.ts",
-                    FileType = "component",
-                    Content = formComponentContent
-                });
-
-                // Generate Form Component HTML
-                var formHtmlContent = _angularService.GenerateFormHtml(table);
-                files.Add(new GeneratedFile
-                {
-                    FileName = $"{camelCaseName}-form.html",
-                    FilePath = $"{basePath}/components/{camelCaseName}-form/{camelCaseName}-form.html",
-                    FileType = "template",
-                    Content = formHtmlContent
-                });
-
-                // Generate Form Component CSS
-                var formCssContent = _angularService.GenerateFormCss(table);
-                files.Add(new GeneratedFile
-                {
-                    FileName = $"{camelCaseName}-form.css",
-                    FilePath = $"{basePath}/components/{camelCaseName}-form/{camelCaseName}-form.css",
-                    FileType = "stylesheet",
-                    Content = formCssContent
-                });
-
-                _logger.LogInformation("Generated {FileCount} Angular files for table {TableName}", files.Count, table.TableName);
-            }
-            catch (Exception ex)
+            // Generate Service
+            var serviceContent = _angularService.GenerateService(table);
+            files.Add(new GeneratedFile
             {
-                _logger.LogError(ex, "Error generating Angular files for table {TableName}", table.TableName);
-                throw;
-            }
+                FileName = $"{camelCaseName}.service.ts",
+                FilePath = $"{basePath}/services/{camelCaseName}.service.ts",
+                FileType = "service",
+                Content = serviceContent
+            });
+
+            // Generate List Component TypeScript
+            var listComponentContent = _angularService.GenerateListComponent(table);
+            files.Add(new GeneratedFile
+            {
+                FileName = $"{camelCaseName}-list.ts",
+                FilePath = $"{basePath}/components/{camelCaseName}-list/{camelCaseName}-list.ts",
+                FileType = "component",
+                Content = listComponentContent
+            });
+
+            // Generate List Component HTML
+            var listHtmlContent = _angularService.GenerateListHtml(table);
+            files.Add(new GeneratedFile
+            {
+                FileName = $"{camelCaseName}-list.html",
+                FilePath = $"{basePath}/components/{camelCaseName}-list/{camelCaseName}-list.html",
+                FileType = "template",
+                Content = listHtmlContent
+            });
+
+            // Generate List Component CSS
+            var listCssContent = _angularService.GenerateListCss(table);
+            files.Add(new GeneratedFile
+            {
+                FileName = $"{camelCaseName}-list.css",
+                FilePath = $"{basePath}/components/{camelCaseName}-list/{camelCaseName}-list.css",
+                FileType = "stylesheet",
+                Content = listCssContent
+            });
+
+            // Generate Form Component TypeScript
+            var formComponentContent = _angularService.GenerateFormComponent(table);
+            files.Add(new GeneratedFile
+            {
+                FileName = $"{camelCaseName}-form.ts",
+                FilePath = $"{basePath}/components/{camelCaseName}-form/{camelCaseName}-form.ts",
+                FileType = "component",
+                Content = formComponentContent
+            });
+
+            // Generate Form Component HTML
+            var formHtmlContent = _angularService.GenerateFormHtml(table);
+            files.Add(new GeneratedFile
+            {
+                FileName = $"{camelCaseName}-form.html",
+                FilePath = $"{basePath}/components/{camelCaseName}-form/{camelCaseName}-form.html",
+                FileType = "template",
+                Content = formHtmlContent
+            });
+
+            // Generate Form Component CSS
+            var formCssContent = _angularService.GenerateFormCss(table);
+            files.Add(new GeneratedFile
+            {
+                FileName = $"{camelCaseName}-form.css",
+                FilePath = $"{basePath}/components/{camelCaseName}-form/{camelCaseName}-form.css",
+                FileType = "stylesheet",
+                Content = formCssContent
+            });
+
+            _logger.LogInformation("Generated {FileCount} Angular files for table {TableName}", files.Count, table.TableName);
 
             return files;
         }
 
-        private List<GeneratedFile> GenerateNavigationUpdates(DatabaseTable table, string basePath)
-        {
-            var files = new List<GeneratedFile>();
-            var className = ToPascalCase(table.TableName);
-            var camelCaseName = ToCamelCase(table.TableName);
-
-            try
-            {
-                // Generate routes update file
-                var routeUpdateContent = GenerateRouteUpdateScript(table);
-                files.Add(new GeneratedFile
+                private List<GeneratedFile> GenerateApiFiles(DatabaseTable table, string? controllersPathOverride)
                 {
-                    FileName = $"update-{camelCaseName}-routes.ts",
-                    FilePath = $"{basePath}/generated/{camelCaseName}-route-update.ts",
-                    FileType = "route-update",
-                    Content = routeUpdateContent
-                });
+                        var controllersDirectory = GetApiControllersDirectory(controllersPathOverride);
+                        var controllerFile = _apiService.GenerateController(table, controllersDirectory);
 
-                // Generate sidebar update file
-                var sidebarUpdateContent = GenerateSidebarUpdateScript(table);
-                files.Add(new GeneratedFile
+                        _logger.LogInformation("Generated API controller template for table {TableName}", table.TableName);
+
+                        return new List<GeneratedFile> { controllerFile };
+                }
+
+                private string GetApiControllersDirectory(string? overridePath)
                 {
-                    FileName = $"update-{camelCaseName}-sidebar.ts",
-                    FilePath = $"{basePath}/generated/{camelCaseName}-sidebar-update.ts",
-                    FileType = "sidebar-update",
-                    Content = sidebarUpdateContent
-                });
+                        if (!string.IsNullOrWhiteSpace(overridePath))
+                        {
+                                var candidate = Path.IsPathRooted(overridePath)
+                                        ? overridePath
+                                        : Path.Combine(_projectRootPath, overridePath);
 
-                _logger.LogInformation("Generated {FileCount} navigation update files for table {TableName}", files.Count, table.TableName);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error generating navigation update files for table {TableName}", table.TableName);
-                throw;
-            }
+                                return Path.GetFullPath(candidate);
+                        }
 
-            return files;
-        }
-
-        private static string GenerateRouteUpdateScript(DatabaseTable table)
-        {
-            var className = ToPascalCase(table.TableName);
-            var camelCaseName = ToCamelCase(table.TableName);
-
-            return $@"// Auto-generated route update for {className}
-// This file provides the import statements and route configurations
-// to add to your app.routes.ts file
-
-export const {camelCaseName}RouteConfig = {{
-  imports: [
-    ""import {{ {className}List }} from './components/{camelCaseName}-list/{camelCaseName}-list';"",
-    ""import {{ {className}Form }} from './components/{camelCaseName}-form/{camelCaseName}-form';""
-  ],
-  routes: [
-    ""{{ path: '{camelCaseName}', component: {className}List, canActivate: [authGuard] }},"",
-    ""{{ path: '{camelCaseName}/new', component: {className}Form, canActivate: [authGuard] }},"",
-    ""{{ path: '{camelCaseName}/edit/:id', component: {className}Form, canActivate: [authGuard] }},""
-  ]
-}};
-
-// Instructions:
-// 1. Add the import statements to the top of your app.routes.ts file
-// 2. Add the route objects to your routes array
-// 3. The routes should be placed before the wildcard route (path: '**')
-
-console.log('Route configuration for {className}:');
-console.log('Add these imports to app.routes.ts:');
-{camelCaseName}RouteConfig.imports.forEach(imp => console.log(imp));
-console.log('\\nAdd these routes to the routes array:');
-{camelCaseName}RouteConfig.routes.forEach(route => console.log(route));
-";
-        }
-
-        private static string GenerateSidebarUpdateScript(DatabaseTable table)
-        {
-            var className = ToPascalCase(table.TableName);
-            var camelCaseName = ToCamelCase(table.TableName);
-
-            return $@"// Auto-generated sidebar menu update for {className}
-// This file provides the menu item configuration to add to your sidebar
-
-export const {camelCaseName}MenuItem = {{
-  title: '{className}',
-  icon: '📋',
-  route: '/{camelCaseName}'
-}};
-
-// Instructions:
-// 1. Open your sidebar.ts file (typically in components/sidebar/sidebar.ts)
-// 2. Add the menu item to your menuItems array
-// 3. Place it in the appropriate position in the array
-
-// Example of where to add it:
-/*
-menuItems: MenuItem[] = [
-  {{ title: 'Dashboard', icon: '📊', route: '/dashboard' }},
-  {{ title: 'Code Generator', icon: '🔧', route: '/code-generator' }},
-  {{ title: 'Products', icon: '📦', route: '/products' }},
-  {{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}, // <- Add this line
-  {{ title: 'Settings', icon: '⚙️', route: '/settings' }}
-];
-*/
-
-console.log('Menu item for {className}:');
-console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }},`);
-";
-        }
+                        return Path.Combine(_projectRootPath, "Controllers", "Generated");
+                }
 
         private async Task WriteFileToDiskAsync(GeneratedFile file)
         {
@@ -341,7 +261,7 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to write file: {FilePath}", file.FilePath);
-                throw;
+                throw new IOException($"Failed to write generated file '{file.FilePath}'", ex);
             }
         }
 
@@ -370,31 +290,30 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
                     Path.Combine(request.AngularPath, "components")
                 };
 
-                foreach (var directory in directoriesToClean)
+                foreach (var directory in directoriesToClean.Where(Directory.Exists))
                 {
-                    if (Directory.Exists(directory))
+                    try
                     {
-                        try
+                        if (directory.EndsWith("components", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (directory.EndsWith("components"))
-                            {
-                                // For components directory, only delete generated component folders (not existing ones like product-list, etc.)
-                                await CleanupGeneratedComponentsAsync(directory, generatedTableNames, deletedFiles, errors);
-                            }
-                            else
-                            {
-                                // For models and services, delete generated files but keep existing ones
-                                await CleanupGeneratedFilesInDirectoryAsync(directory, deletedFiles, errors);
-                            }
+                            // For components directory, only delete generated component folders (not existing ones like product-list, etc.)
+                            await CleanupGeneratedComponentsAsync(directory, generatedTableNames, deletedFiles, errors);
                         }
-                        catch (Exception ex)
+                        else
                         {
-                            var errorMsg = $"Error cleaning directory {directory}: {ex.Message}";
-                            errors.Add(errorMsg);
-                            _logger.LogError(ex, "Error cleaning directory {Directory}", directory);
+                            // For models and services, delete generated files but keep existing ones
+                            await CleanupGeneratedFilesInDirectoryAsync(directory, deletedFiles, errors);
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        var errorMsg = $"Error cleaning directory {directory}: {ex.Message}";
+                        errors.Add(errorMsg);
+                        _logger.LogError(ex, "Error cleaning directory {Directory}", directory);
+                    }
                 }
+
+                await CleanupGeneratedApiControllersAsync(request.ApiControllersPath, deletedFiles, errors);
 
                 // Cleanup navigation entries for generated components
                 await CleanupNavigationEntriesAsync(generatedTableNames, request.AngularPath, errors);
@@ -420,6 +339,48 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
             return result;
         }
 
+        private Task CleanupGeneratedApiControllersAsync(string? controllersPathOverride, List<string> deletedFiles, List<string> errors)
+        {
+            try
+            {
+                var controllersDirectory = GetApiControllersDirectory(controllersPathOverride);
+                if (!Directory.Exists(controllersDirectory))
+                {
+                    return Task.CompletedTask;
+                }
+
+                foreach (var controllerFile in Directory.GetFiles(controllersDirectory, "*Controller.cs", SearchOption.TopDirectoryOnly))
+                {
+                    try
+                    {
+                        File.Delete(controllerFile);
+                        deletedFiles.Add(controllerFile);
+                        _logger.LogInformation("Deleted generated API controller: {File}", controllerFile);
+                    }
+                    catch (Exception ex)
+                    {
+                        var errorMessage = $"Failed to delete controller {controllerFile}: {ex.Message}";
+                        errors.Add(errorMessage);
+                        _logger.LogError(ex, "Failed to delete generated API controller {ControllerFile}", controllerFile);
+                    }
+                }
+
+                if (!Directory.EnumerateFileSystemEntries(controllersDirectory).Any())
+                {
+                    Directory.Delete(controllersDirectory);
+                    _logger.LogInformation("Deleted empty API controllers directory: {Directory}", controllersDirectory);
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Failed to cleanup API controllers: {ex.Message}";
+                errors.Add(errorMessage);
+                _logger.LogError(ex, "Error while cleaning generated API controllers");
+            }
+
+            return Task.CompletedTask;
+        }
+
         private async Task CleanupNavigationEntriesAsync(HashSet<string> tableNames, string angularPath, List<string> errors)
         {
             try
@@ -436,6 +397,7 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
                     catch (Exception ex)
                     {
                         errors.Add($"Failed to remove navigation entries for {tableName}: {ex.Message}");
+                        _logger.LogError(ex, "Failed to remove navigation entries for {TableName}", tableName);
                     }
                 }
             }
@@ -490,6 +452,7 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
                     catch (Exception ex)
                     {
                         errors.Add($"Failed to delete component directory {dir}: {ex.Message}");
+                        _logger.LogError(ex, "Failed to delete generated component directory {Directory}", dir);
                     }
                 }
             }
@@ -515,6 +478,7 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
                     catch (Exception ex)
                     {
                         errors.Add($"Failed to delete file {file}: {ex.Message}");
+                        _logger.LogError(ex, "Failed to delete generated file {File}", file);
                     }
                 }
             }
@@ -549,6 +513,22 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
                    !existingFiles.Contains(fileName.ToLowerInvariant());
         }
 
+        private static (string Schema, string TableName) ParseTableIdentifier(string tableFullName)
+        {
+            if (string.IsNullOrWhiteSpace(tableFullName))
+            {
+                return ("dbo", string.Empty);
+            }
+
+            var parts = tableFullName.Split('.', 2);
+            if (parts.Length == 2)
+            {
+                return (parts[0], parts[1]);
+            }
+
+            return ("dbo", parts[0]);
+        }
+
         private static string ToPascalCase(string input)
         {
             return string.Join("", input.Split('_', '-', ' ')
@@ -559,6 +539,24 @@ console.log(`{{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}
         {
             var pascalCase = ToPascalCase(input);
             return char.ToLowerInvariant(pascalCase[0]) + pascalCase.Substring(1);
+        }
+
+        private static string ResolveProjectRootPath()
+        {
+            var directoryInfo = new DirectoryInfo(AppContext.BaseDirectory);
+
+            while (directoryInfo != null)
+            {
+                var projectFilePath = Path.Combine(directoryInfo.FullName, "CodeGenerator.API.csproj");
+                if (File.Exists(projectFilePath))
+                {
+                    return directoryInfo.FullName;
+                }
+
+                directoryInfo = directoryInfo.Parent;
+            }
+
+            throw new DirectoryNotFoundException("Unable to locate the CodeGenerator.API project directory.");
         }
     }
 }

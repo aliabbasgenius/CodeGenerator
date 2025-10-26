@@ -12,6 +12,11 @@ namespace CodeGenerator.API.Models
 
     public class DatabaseColumn
     {
+        private const string StringTypeScript = "string";
+        private const string NumberTypeScript = "number";
+        private const string BooleanTypeScript = "boolean";
+        private const string DateTypeScript = "Date";
+
         public string ColumnName { get; set; } = string.Empty;
         public string DataType { get; set; } = string.Empty;
         public bool IsNullable { get; set; }
@@ -52,13 +57,13 @@ namespace CodeGenerator.API.Models
             return DataType.ToLower() switch
             {
                 "int" or "integer" or "bigint" or "smallint" or "tinyint" or "decimal" or "numeric" 
-                or "money" or "smallmoney" or "float" or "real" => "number",
-                "bit" => "boolean",
-                "datetime" or "datetime2" or "smalldatetime" or "date" or "time" or "datetimeoffset" => "Date",
-                "uniqueidentifier" => "string",
-                "varchar" or "nvarchar" or "char" or "nchar" or "text" or "ntext" => "string",
-                "varbinary" or "binary" or "image" => "string", // Base64 encoded
-                _ => "string"
+                or "money" or "smallmoney" or "float" or "real" => NumberTypeScript,
+                "bit" => BooleanTypeScript,
+                "datetime" or "datetime2" or "smalldatetime" or "date" or "time" or "datetimeoffset" => DateTypeScript,
+                "uniqueidentifier" => StringTypeScript,
+                "varchar" or "nvarchar" or "char" or "nchar" or "text" or "ntext" => StringTypeScript,
+                "varbinary" or "binary" or "image" => StringTypeScript, // Base64 encoded
+                _ => StringTypeScript
             };
         }
     }
@@ -72,6 +77,7 @@ namespace CodeGenerator.API.Models
         public bool GenerateAngularCode { get; set; } = true;
         public bool GenerateApiCode { get; set; } = false;
         public string AngularPath { get; set; } = "../AngularApp/src/app";
+        public string ApiControllersPath { get; set; } = string.Empty;
     }
 
     public class DatabaseCodeGenerationResult
@@ -86,6 +92,7 @@ namespace CodeGenerator.API.Models
     {
         [Required]
         public string AngularPath { get; set; } = string.Empty;
+        public string ApiControllersPath { get; set; } = string.Empty;
     }
 
     public class CleanupResult

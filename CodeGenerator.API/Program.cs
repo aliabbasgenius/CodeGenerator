@@ -24,6 +24,7 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped<ICodeGenerationService, CodeGenerationService>();
 builder.Services.AddScoped<IDatabaseDiscoveryService, DatabaseDiscoveryService>();
 builder.Services.AddScoped<IAngularCodeGenerationService, AngularCodeGenerationService>();
+builder.Services.AddScoped<IApiCodeGenerationService, ApiCodeGenerationService>();
 builder.Services.AddScoped<IDatabaseCodeGenerationService, DatabaseCodeGenerationService>();
 builder.Services.AddScoped<NavigationIntegrationService>();
 

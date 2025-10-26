@@ -30,6 +30,7 @@ export class CodeGenerator implements OnInit, OnDestroy {
   generateApiCode = false;
   outputPath = './generated';
   angularPath = 'd:/Study/Projects/CodeGenerator/AngularApp/src/app';
+  apiControllersPath = 'd:/Study/Projects/CodeGenerator/CodeGenerator.API/Controllers/Generated';
 
   private subscription: Subscription = new Subscription();
 
@@ -132,7 +133,8 @@ export class CodeGenerator implements OnInit, OnDestroy {
       outputPath: this.outputPath,
       generateAngularCode: this.generateAngularCode,
       generateApiCode: this.generateApiCode,
-      angularPath: this.angularPath
+      angularPath: this.angularPath,
+      apiControllersPath: this.apiControllersPath
     };
 
     this.subscription.add(
@@ -195,7 +197,8 @@ export class CodeGenerator implements OnInit, OnDestroy {
     this.cleanupResult = 'Starting cleanup...';
 
     const request = {
-      angularPath: this.angularPath
+      angularPath: this.angularPath,
+      apiControllersPath: this.apiControllersPath
     };
 
     this.subscription.add(
