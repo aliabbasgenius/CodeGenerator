@@ -2,6 +2,7 @@ using CodeGenerator.API.Models;
 using CodeGenerator.API.Services;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace CodeGenerator.API.Services
 {
@@ -111,7 +112,7 @@ namespace CodeGenerator.API.Services
 
                 if (request.GenerateApiCode)
                 {
-                    var apiFiles = GenerateApiFiles(table, request.ApiControllersPath);
+                    var apiFiles = GenerateApiArtifacts(table, request.ApiControllersPath);
 
                     foreach (var file in apiFiles)
                     {
@@ -218,29 +219,43 @@ namespace CodeGenerator.API.Services
             return files;
         }
 
-                private List<GeneratedFile> GenerateApiFiles(DatabaseTable table, string? controllersPathOverride)
-                {
-                        var controllersDirectory = GetApiControllersDirectory(controllersPathOverride);
-                        var controllerFile = _apiService.GenerateController(table, controllersDirectory);
+        private List<GeneratedFile> GenerateApiArtifacts(DatabaseTable table, string? controllersPathOverride)
+        {
+            var controllersDirectory = GetApiControllersDirectory(controllersPathOverride);
+            var modelsDirectory = GetApiModelsDirectory();
+            var configurationsDirectory = GetApiConfigurationsDirectory();
 
-                        _logger.LogInformation("Generated API controller template for table {TableName}", table.TableName);
+            var options = new ApiGenerationOptions(controllersDirectory, modelsDirectory, configurationsDirectory);
+            var artifacts = _apiService.GenerateApiArtifacts(table, options).ToList();
 
-                        return new List<GeneratedFile> { controllerFile };
-                }
+            _logger.LogInformation("Generated API artifacts for table {TableName}", table.TableName);
 
-                private string GetApiControllersDirectory(string? overridePath)
-                {
-                        if (!string.IsNullOrWhiteSpace(overridePath))
-                        {
-                                var candidate = Path.IsPathRooted(overridePath)
-                                        ? overridePath
-                                        : Path.Combine(_projectRootPath, overridePath);
+            return artifacts;
+        }
 
-                                return Path.GetFullPath(candidate);
-                        }
+        private string GetApiControllersDirectory(string? overridePath)
+        {
+            if (!string.IsNullOrWhiteSpace(overridePath))
+            {
+                var candidate = Path.IsPathRooted(overridePath)
+                    ? overridePath
+                    : Path.Combine(_projectRootPath, overridePath);
 
-                        return Path.Combine(_projectRootPath, "Controllers", "Generated");
-                }
+                return Path.GetFullPath(candidate);
+            }
+
+            return Path.Combine(_projectRootPath, "Controllers", "Generated");
+        }
+
+        private string GetApiModelsDirectory()
+        {
+            return Path.Combine(_projectRootPath, "Models", "Generated");
+        }
+
+        private string GetApiConfigurationsDirectory()
+        {
+            return Path.Combine(_projectRootPath, "Data", "Generated");
+        }
 
         private async Task WriteFileToDiskAsync(GeneratedFile file)
         {
@@ -313,7 +328,7 @@ namespace CodeGenerator.API.Services
                     }
                 }
 
-                await CleanupGeneratedApiControllersAsync(request.ApiControllersPath, deletedFiles, errors);
+                await CleanupGeneratedApiArtifactsAsync(request.ApiControllersPath, deletedFiles, errors);
 
                 // Cleanup navigation entries for generated components
                 await CleanupNavigationEntriesAsync(generatedTableNames, request.AngularPath, errors);
@@ -339,46 +354,66 @@ namespace CodeGenerator.API.Services
             return result;
         }
 
-        private Task CleanupGeneratedApiControllersAsync(string? controllersPathOverride, List<string> deletedFiles, List<string> errors)
+        private Task CleanupGeneratedApiArtifactsAsync(string? controllersPathOverride, List<string> deletedFiles, List<string> errors)
         {
             try
             {
                 var controllersDirectory = GetApiControllersDirectory(controllersPathOverride);
-                if (!Directory.Exists(controllersDirectory))
-                {
-                    return Task.CompletedTask;
-                }
+                DeleteGeneratedFilesInDirectory(controllersDirectory, "*Controller.cs", deletedFiles, errors);
 
-                foreach (var controllerFile in Directory.GetFiles(controllersDirectory, "*Controller.cs", SearchOption.TopDirectoryOnly))
-                {
-                    try
-                    {
-                        File.Delete(controllerFile);
-                        deletedFiles.Add(controllerFile);
-                        _logger.LogInformation("Deleted generated API controller: {File}", controllerFile);
-                    }
-                    catch (Exception ex)
-                    {
-                        var errorMessage = $"Failed to delete controller {controllerFile}: {ex.Message}";
-                        errors.Add(errorMessage);
-                        _logger.LogError(ex, "Failed to delete generated API controller {ControllerFile}", controllerFile);
-                    }
-                }
+                var modelsDirectory = GetApiModelsDirectory();
+                DeleteGeneratedFilesInDirectory(modelsDirectory, "*.cs", deletedFiles, errors);
 
-                if (!Directory.EnumerateFileSystemEntries(controllersDirectory).Any())
+                var configurationsDirectory = GetApiConfigurationsDirectory();
+                DeleteGeneratedFilesInDirectory(configurationsDirectory, "*Configuration.cs", deletedFiles, errors);
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Failed to cleanup API artifacts: {ex.Message}";
+                errors.Add(errorMessage);
+                _logger.LogError(ex, "Error while cleaning generated API artifacts");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private void DeleteGeneratedFilesInDirectory(string directory, string searchPattern, List<string> deletedFiles, List<string> errors)
+        {
+            if (!Directory.Exists(directory))
+            {
+                return;
+            }
+
+            foreach (var file in Directory.GetFiles(directory, searchPattern, SearchOption.TopDirectoryOnly))
+            {
+                try
                 {
-                    Directory.Delete(controllersDirectory);
-                    _logger.LogInformation("Deleted empty API controllers directory: {Directory}", controllersDirectory);
+                    File.Delete(file);
+                    deletedFiles.Add(file);
+                    _logger.LogInformation("Deleted generated API artifact: {File}", file);
+                }
+                catch (Exception ex)
+                {
+                    var errorMessage = $"Failed to delete file {file}: {ex.Message}";
+                    errors.Add(errorMessage);
+                    _logger.LogError(ex, "Failed to delete generated API artifact {File}", file);
+                }
+            }
+
+            try
+            {
+                if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                {
+                    Directory.Delete(directory);
+                    _logger.LogInformation("Deleted empty directory: {Directory}", directory);
                 }
             }
             catch (Exception ex)
             {
-                var errorMessage = $"Failed to cleanup API controllers: {ex.Message}";
+                var errorMessage = $"Failed to delete directory {directory}: {ex.Message}";
                 errors.Add(errorMessage);
-                _logger.LogError(ex, "Error while cleaning generated API controllers");
+                _logger.LogError(ex, "Failed to delete generated directory {Directory}", directory);
             }
-
-            return Task.CompletedTask;
         }
 
         private async Task CleanupNavigationEntriesAsync(HashSet<string> tableNames, string angularPath, List<string> errors)
