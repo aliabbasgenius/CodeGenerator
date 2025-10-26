@@ -32,7 +32,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularApp", policy =>
     {
-        policy.WithOrigins("http://localhost:4300", "https://localhost:4300", "http://localhost:4201", "http://localhost:53691", "http://localhost:49648", "http://localhost:3000")
+        policy.SetIsOriginAllowed(_ => true)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
