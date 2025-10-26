@@ -27,7 +27,7 @@ export class CodeGenerator implements OnInit, OnDestroy {
   
   // Generation options
   generateAngularCode = true;
-  generateApiCode = false;
+  generateApiCode = true;
   outputPath = './generated';
   angularPath = 'd:/Study/Projects/CodeGenerator/AngularApp/src/app';
   apiControllersPath = 'd:/Study/Projects/CodeGenerator/CodeGenerator.API/Controllers/Generated';
