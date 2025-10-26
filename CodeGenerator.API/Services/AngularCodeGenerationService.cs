@@ -269,6 +269,16 @@ export class {componentName} implements OnInit, OnDestroy {{
     filtered.sort((a, b) => {{
       const aValue = a[this.sortField];
       const bValue = b[this.sortField];
+
+      if (aValue == null && bValue == null) {{
+        return 0;
+      }}
+      if (aValue == null) {{
+        return 1;
+      }}
+      if (bValue == null) {{
+        return -1;
+      }}
       
       let comparison = 0;
       if (aValue < bValue) comparison = -1;
@@ -647,7 +657,7 @@ export class {componentName} implements OnInit {{
               [(ngModel)]=""selectedCategory""
               (change)=""onCategoryChange()"">
               <option value="""">All Categories</option>
-              <option *ngFor=""let category of categories"" [value]=""category"">{{ category }}</option>
+              <option *ngFor=""let category of categories"" [value]=""category"">{{{{ category }}}}</option>
             </select>
           </div>
         </div>
@@ -663,7 +673,7 @@ export class {componentName} implements OnInit {{
             </thead>
             <tbody>
               <tr *ngFor=""let item of getPaginated{className}s()"" class=""table-row"">
-{GenerateTableCells(displayColumns, camelCaseName)}
+{GenerateTableCells(displayColumns, "item")}
                 <td class=""actions-cell"">
                   <button 
                     type=""button"" 
@@ -685,14 +695,14 @@ export class {componentName} implements OnInit {{
           <div class=""empty-state"" *ngIf=""filtered{className}s.length === 0"">
             <div class=""empty-icon"">📋</div>
             <h3>No {className}s Found</h3>
-            <p>{{ searchTerm ? 'No {camelCaseName}s match your search criteria.' : 'No {camelCaseName}s available. Add one to get started.' }}</p>
+            <p>{{{{ searchTerm ? 'No {camelCaseName}s match your search criteria.' : 'No {camelCaseName}s available. Add one to get started.' }}}}</p>
           </div>
         </div>
 
         <!-- Pagination -->
         <div class=""pagination-section"" *ngIf=""totalItems > 0"">
           <div class=""pagination-info"">
-            <span>Showing {{ getStartIndex() }} to {{ getEndIndex() }} of {{ totalItems }} entries</span>
+            <span>Showing {{{{ getStartIndex() }}}} to {{{{ getEndIndex() }}}} of {{{{ totalItems }}}} entries</span>
             <div class=""page-size-selector"">
               <label>Show:</label>
               <select [(ngModel)]=""itemsPerPage"" (change)=""onPageSizeChange()"">
@@ -722,7 +732,7 @@ export class {componentName} implements OnInit {{
                 [class.active]=""page === currentPage""
                 [disabled]=""page === -1""
                 (click)=""page !== -1 && goToPage(page)"">
-                {{ page === -1 ? '...' : page }}
+                {{{{ page === -1 ? '...' : page }}}}
               </button>
             </div>
 
@@ -754,7 +764,7 @@ export class {componentName} implements OnInit {{
                 var propertyName = ToCamelCase(column.ColumnName);
                 sb.AppendLine($"                <th class=\"sortable-header\" (click)=\"sortBy('{propertyName}')\">");
                 sb.AppendLine($"                  {displayName}");
-                sb.AppendLine($"                  <span class=\"sort-icon\">{{ getSortIcon('{propertyName}') }}</span>");
+                sb.AppendLine($"                  <span class=\"sort-icon\">{{{{ getSortIcon('{propertyName}') }}}}</span>");
                 sb.AppendLine("                </th>");
             }
             return sb.ToString();
@@ -776,11 +786,11 @@ export class {componentName} implements OnInit {{
         {
             return column.TypeScriptType switch
             {
-                "number" when column.ColumnName.ToLower().Contains("price") || column.ColumnName.ToLower().Contains("amount") || column.ColumnName.ToLower().Contains("cost") 
-                    => $"{{ formatCurrency({itemName}.{propertyName}) }}",
-                "Date" => $"{{ {itemName}.{propertyName} | date:'short' }}",
-                "boolean" => $"<span class=\"status-badge\" [class.status-active]=\"{itemName}.{propertyName}\">{{ {itemName}.{propertyName} ? 'Yes' : 'No' }}</span>",
-                _ => $"{{ {itemName}.{propertyName} }}"
+        "number" when column.ColumnName.ToLower().Contains("price") || column.ColumnName.ToLower().Contains("amount") || column.ColumnName.ToLower().Contains("cost") 
+          => $"{{{{ formatCurrency({itemName}.{propertyName}) }}}}",
+        "Date" => $"{{{{ {itemName}.{propertyName} | date:'short' }}}}",
+        "boolean" => $"<span class=\"status-badge\" [class.status-active]=\"{itemName}.{propertyName}\">{{{{ {itemName}.{propertyName} ? 'Yes' : 'No' }}}}</span>",
+        _ => $"{{{{ {itemName}.{propertyName} }}}}"
             };
         }
 
@@ -799,7 +809,7 @@ export class {componentName} implements OnInit {{
     <main class=""main-content"">
       <div class=""{camelCaseName}-form-container"">
         <div class=""header-section"">
-          <h1>{{ isEditMode ? 'Edit' : 'Add New' }} {className}</h1>
+          <h1>{{{{ isEditMode ? 'Edit' : 'Add New' }}}} {className}</h1>
         </div>
 
         <form [formGroup]=""{camelCaseName}Form"" (ngSubmit)=""onSubmit()"" class=""{camelCaseName}-form"">
@@ -880,7 +890,7 @@ export class {componentName} implements OnInit {{
                 }
 
                 sb.AppendLine($"              <div class=\"field-error\" *ngIf=\"getFieldError('{propertyName}')\">");
-                sb.AppendLine($"                {{ getFieldError('{propertyName}') }}");
+                sb.AppendLine($"                {{{{ getFieldError('{propertyName}') }}}}");
                 sb.AppendLine("              </div>");
                 sb.AppendLine("            </div>");
                 sb.AppendLine();
