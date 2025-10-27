@@ -596,7 +596,7 @@ export class {componentName} implements OnInit {{
                 validators.Add("Validators.required");
             }
 
-            if (column.MaxLength.HasValue && column.TypeScriptType == "string")
+      if (column.MaxLength.HasValue && column.MaxLength > 0 && column.TypeScriptType == "string")
             {
                 validators.Add($"Validators.maxLength({column.MaxLength})");
             }
