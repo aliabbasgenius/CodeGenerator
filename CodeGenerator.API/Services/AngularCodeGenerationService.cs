@@ -1,5 +1,6 @@
-using CodeGenerator.API.Models;
+using System;
 using System.Text;
+using CodeGenerator.API.Models;
 
 namespace CodeGenerator.API.Services
 {
@@ -50,107 +51,46 @@ namespace CodeGenerator.API.Services
       var className = names.SingularPascal;
       var serviceName = $"{className}Service";
       var interfaceName = className;
-  var camelCaseName = names.SingularCamel;
-  var pluralCamelCaseName = names.PluralCamel;
-            var primaryKey = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
-            var primaryKeyType = primaryKey?.TypeScriptType ?? "number";
-            var primaryKeyProperty = primaryKey?.ColumnName != null ? ToCamelCase(primaryKey.ColumnName) : "id";
+      var pluralCamelCaseName = names.PluralCamel;
+      var primaryKey = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
+      var primaryKeyType = primaryKey?.TypeScriptType ?? "number";
+      var primaryKeyProperty = primaryKey?.ColumnName != null ? ToCamelCase(primaryKey.ColumnName) : "id";
 
-            var template = $@"import {{ Injectable }} from '@angular/core';
-import {{ BehaviorSubject, Observable }} from 'rxjs';
+      var template = $@"import {{ Injectable }} from '@angular/core';
+import {{ HttpClient }} from '@angular/common/http';
+import {{ Observable }} from 'rxjs';
 import {{ {interfaceName} }} from '../models/{pluralCamelCaseName}.model';
+import {{ AppConfigService }} from '../core/config/app-config.service';
 
 @Injectable({{
   providedIn: 'root'
 }})
 export class {serviceName} {{
-  private {pluralCamelCaseName}: {interfaceName}[] = [];
-  private {pluralCamelCaseName}Subject = new BehaviorSubject<{interfaceName}[]>([]);
-  private nextId = 1;
+  private readonly resourceUrl: string;
 
-  constructor() {{
-    this.initializeSampleData();
-  }}
-
-  private initializeSampleData(): void {{
-    // Add some sample data
-    const sampleData: {interfaceName}[] = [
-      // TODO: Add sample data based on your table structure
-    ];
-    
-    this.{pluralCamelCaseName} = sampleData;
-    this.{pluralCamelCaseName}Subject.next(this.{pluralCamelCaseName});
+  constructor(private http: HttpClient, private appConfig: AppConfigService) {{
+    const base = this.appConfig.apiBaseUrl.replace(/\/$/, '');
+    this.resourceUrl = `${{base}}/api/{names.PluralPascal}`;
   }}
 
   get{className}s(): Observable<{interfaceName}[]> {{
-    return this.{pluralCamelCaseName}Subject.asObservable();
+    return this.http.get<{interfaceName}[]>(this.resourceUrl);
   }}
 
-  get{className}ById(id: {primaryKeyType}): {interfaceName} | undefined {{
-    return this.{pluralCamelCaseName}.find(item => item.{primaryKeyProperty} === id);
+  get{className}ById(id: {primaryKeyType}): Observable<{interfaceName}> {{
+    return this.http.get<{interfaceName}>(`${{this.resourceUrl}}/${{id}}`);
   }}
 
-  add{className}(item: Omit<{interfaceName}, '{primaryKeyProperty}'>): boolean {{
-    try {{
-      const new{className}: {interfaceName} = {{
-        ...item,
-        {primaryKeyProperty}: this.nextId++
-      }} as {interfaceName};
-      
-      this.{pluralCamelCaseName}.push(new{className});
-      this.{pluralCamelCaseName}Subject.next([...this.{pluralCamelCaseName}]);
-      return true;
-    }} catch (error) {{
-      console.error('Error adding {camelCaseName}:', error);
-      return false;
-    }}
+  add{className}(item: Omit<{interfaceName}, '{primaryKeyProperty}'>): Observable<{interfaceName}> {{
+    return this.http.post<{interfaceName}>(this.resourceUrl, item);
   }}
 
-  update{className}(id: {primaryKeyType}, updates: Partial<{interfaceName}>): boolean {{
-    try {{
-      const index = this.{pluralCamelCaseName}.findIndex(item => item.{primaryKeyProperty} === id);
-      if (index !== -1) {{
-        this.{pluralCamelCaseName}[index] = {{ ...this.{pluralCamelCaseName}[index], ...updates }};
-        this.{pluralCamelCaseName}Subject.next([...this.{pluralCamelCaseName}]);
-        return true;
-      }}
-      return false;
-    }} catch (error) {{
-      console.error('Error updating {camelCaseName}:', error);
-      return false;
-    }}
+  update{className}(id: {primaryKeyType}, item: {interfaceName}): Observable<void> {{
+    return this.http.put<void>(`${{this.resourceUrl}}/${{id}}`, item);
   }}
 
-  delete{className}(id: {primaryKeyType}): boolean {{
-    try {{
-      const index = this.{pluralCamelCaseName}.findIndex(item => item.{primaryKeyProperty} === id);
-      if (index !== -1) {{
-        this.{pluralCamelCaseName}.splice(index, 1);
-        this.{pluralCamelCaseName}Subject.next([...this.{pluralCamelCaseName}]);
-        return true;
-      }}
-      return false;
-    }} catch (error) {{
-      console.error('Error deleting {camelCaseName}:', error);
-      return false;
-    }}
-  }}
-
-  search{className}s(searchTerm: string): {interfaceName}[] {{
-    if (!searchTerm.trim()) {{
-      return this.{pluralCamelCaseName};
-    }}
-    
-    const term = searchTerm.toLowerCase();
-    return this.{pluralCamelCaseName}.filter(item => {{
-      // Search in all string properties
-{GenerateSearchLogic(table)}
-    }});
-  }}
-
-  getCategories(): string[] {{
-    // TODO: Implement category logic based on your table structure
-    return [];
+  delete{className}(id: {primaryKeyType}): Observable<void> {{
+    return this.http.delete<void>(`${{this.resourceUrl}}/${{id}}`);
   }}
 }}";
 
@@ -194,6 +134,19 @@ export class {serviceName} {{
     var componentName = $"{className}List";
     var primaryKey = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
     var primaryKeyProperty = primaryKey?.ColumnName != null ? ToCamelCase(primaryKey.ColumnName) : "id";
+    var stringColumns = table.Columns.Where(c => c.TypeScriptType == "string").ToList();
+    var searchableFields = stringColumns.Select(c => ToCamelCase(c.ColumnName)).ToList();
+    var searchableFieldsLiteral = searchableFields.Any()
+      ? string.Join(", ", searchableFields.Select(field => $"'{field}'"))
+      : string.Empty;
+    var categoryColumn = stringColumns.FirstOrDefault(c =>
+      c.ColumnName.Contains("category", StringComparison.OrdinalIgnoreCase) ||
+      c.ColumnName.Contains("type", StringComparison.OrdinalIgnoreCase) ||
+      c.ColumnName.Contains("status", StringComparison.OrdinalIgnoreCase) ||
+      c.ColumnName.Contains("group", StringComparison.OrdinalIgnoreCase));
+    var categoryFieldLiteral = categoryColumn != null
+      ? $"'{ToCamelCase(categoryColumn.ColumnName)}' as keyof {interfaceName}"
+      : "null";
 
             var template = $@"import {{ Component, OnInit, OnDestroy }} from '@angular/core';
 import {{ CommonModule }} from '@angular/common';
@@ -217,8 +170,10 @@ export class {componentName} implements OnInit, OnDestroy {{
   {pluralCamelCaseName}: {interfaceName}[] = [];
   filtered{className}s: {interfaceName}[] = [];
   searchTerm: string = '';
-  selectedCategory: string = '';
-  categories: string[] = [];
+  selectedCategory: string = 'All';
+  categories: string[] = ['All'];
+  private readonly searchableFields: (keyof {interfaceName})[] = [{searchableFieldsLiteral}];
+  private readonly categoryField: (keyof {interfaceName}) | null = {categoryFieldLiteral};
   
   // Pagination
   currentPage: number = 1;
@@ -238,7 +193,6 @@ export class {componentName} implements OnInit, OnDestroy {{
 
   ngOnInit(): void {{
     this.load{className}s();
-    this.loadCategories();
   }}
 
   ngOnDestroy(): void {{
@@ -247,28 +201,44 @@ export class {componentName} implements OnInit, OnDestroy {{
 
   load{className}s(): void {{
     this.subscription.add(
-      this.{camelCaseName}Service.get{className}s().subscribe({pluralCamelCaseName} => {{
-        this.{pluralCamelCaseName} = {pluralCamelCaseName};
-        this.applyFiltersAndSort();
+      this.{camelCaseName}Service.get{className}s().subscribe({{
+        next: {pluralCamelCaseName} => {{
+          this.{pluralCamelCaseName} = {pluralCamelCaseName};
+          this.selectedCategory = 'All';
+          this.updateCategories();
+          this.applyFiltersAndSort();
+        }},
+        error: error => {{
+          console.error('Error loading {camelCaseName}s', error);
+          this.{pluralCamelCaseName} = [];
+          this.filtered{className}s = [];
+          this.totalItems = 0;
+        }}
       }})
     );
-  }}
-
-  loadCategories(): void {{
-    this.categories = ['All', ...this.{camelCaseName}Service.getCategories()];
   }}
 
   applyFiltersAndSort(): void {{
     let filtered = [...this.{pluralCamelCaseName}];
 
     // Apply search filter
-    if (this.searchTerm.trim()) {{
-      filtered = this.{camelCaseName}Service.search{className}s(this.searchTerm);
+    if (this.searchTerm.trim() && this.searchableFields.length > 0) {{
+      const term = this.searchTerm.toLowerCase();
+      filtered = filtered.filter(item =>
+        this.searchableFields.some(field => {{
+          const value = item[field];
+          return typeof value === 'string' && value.toLowerCase().includes(term);
+        }})
+      );
     }}
 
     // Apply category filter
-    if (this.selectedCategory && this.selectedCategory !== 'All') {{
-      // TODO: Implement category filtering based on your table structure
+    const categoryField = this.categoryField;
+    if (categoryField && this.selectedCategory && this.selectedCategory !== 'All') {{
+      filtered = filtered.filter(item => {{
+        const value = item[categoryField];
+        return typeof value === 'string' && value === this.selectedCategory;
+      }});
     }}
 
     // Apply sorting
@@ -296,6 +266,27 @@ export class {componentName} implements OnInit, OnDestroy {{
     this.filtered{className}s = filtered;
     this.totalItems = filtered.length;
     this.currentPage = 1; // Reset to first page when filtering
+  }}
+
+  private updateCategories(): void {{
+    const categoryField = this.categoryField;
+    if (!categoryField) {{
+      this.categories = ['All'];
+      return;
+    }}
+
+    const values = Array.from(
+      new Set(
+        this.{pluralCamelCaseName}
+          .map(item => item[categoryField])
+          .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+
+    this.categories = ['All', ...values];
+    if (!this.categories.includes(this.selectedCategory)) {{
+      this.selectedCategory = 'All';
+    }}
   }}
 
   onSearch(): void {{
@@ -359,11 +350,12 @@ export class {componentName} implements OnInit, OnDestroy {{
 
   delete{className}(item: {interfaceName}): void {{
     if (confirm(`Are you sure you want to delete this {camelCaseName}?`)) {{
-      if (this.{camelCaseName}Service.delete{className}(item.{primaryKeyProperty})) {{
-        // Item deleted successfully, the subscription will update the list
-      }} else {{
-        alert('Failed to delete {camelCaseName}');
-      }}
+      this.subscription.add(
+        this.{camelCaseName}Service.delete{className}(item.{primaryKeyProperty}).subscribe({{
+          next: () => this.load{className}s(),
+          error: () => alert('Failed to delete {camelCaseName}')
+        }})
+      );
     }}
   }}
 
@@ -440,6 +432,7 @@ export class {componentName} implements OnInit, OnDestroy {{
     var componentName = $"{className}Form";
     var primaryKey = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
     var primaryKeyType = primaryKey?.TypeScriptType ?? "number";
+  var primaryKeyProperty = primaryKey?.ColumnName != null ? ToCamelCase(primaryKey.ColumnName) : "id";
 
             var template = $@"import {{ Component, OnInit }} from '@angular/core';
 import {{ CommonModule }} from '@angular/common';
@@ -491,13 +484,15 @@ export class {componentName} implements OnInit {{
 
   load{className}(): void {{
     if (this.{camelCaseName}Id) {{
-      const {camelCaseName} = this.{camelCaseName}Service.get{className}ById(this.{camelCaseName}Id);
-      if ({camelCaseName}) {{
-        this.{camelCaseName}Form.patchValue({camelCaseName});
-      }} else {{
-        alert('{className} not found');
-        this.router.navigate(['/{routeSegment}']);
-      }}
+      this.{camelCaseName}Service.get{className}ById(this.{camelCaseName}Id).subscribe({{
+        next: {camelCaseName} => {{
+          this.{camelCaseName}Form.patchValue({camelCaseName});
+        }},
+        error: () => {{
+          alert('{className} not found');
+          this.router.navigate(['/{routeSegment}']);
+        }}
+      }});
     }}
   }}
 
@@ -507,23 +502,31 @@ export class {componentName} implements OnInit {{
       const formValue = this.{camelCaseName}Form.value;
 
       if (this.isEditMode && this.{camelCaseName}Id) {{
-        const success = this.{camelCaseName}Service.update{className}(this.{camelCaseName}Id, formValue);
-        if (success) {{
-          alert('{className} updated successfully!');
-          this.router.navigate(['/{routeSegment}']);
-        }} else {{
-          alert('Failed to update {className}');
-        }}
+        const payload = {{ ...formValue, {primaryKeyProperty}: this.{camelCaseName}Id }} as {interfaceName};
+        this.{camelCaseName}Service.update{className}(this.{camelCaseName}Id, payload).subscribe({{
+          next: () => {{
+            alert('{className} updated successfully!');
+            this.router.navigate(['/{routeSegment}']);
+            this.isSubmitting = false;
+          }},
+          error: () => {{
+            alert('Failed to update {className}');
+            this.isSubmitting = false;
+          }}
+        }});
       }} else {{
-        const success = this.{camelCaseName}Service.add{className}(formValue);
-        if (success) {{
-          alert('{className} created successfully!');
-          this.router.navigate(['/{routeSegment}']);
-        }} else {{
-          alert('Failed to create {className}');
-        }}
+        this.{camelCaseName}Service.add{className}(formValue as Omit<{interfaceName}, '{primaryKeyProperty}'>).subscribe({{
+          next: () => {{
+            alert('{className} created successfully!');
+            this.router.navigate(['/{routeSegment}']);
+            this.isSubmitting = false;
+          }},
+          error: () => {{
+            alert('Failed to create {className}');
+            this.isSubmitting = false;
+          }}
+        }});
       }}
-      this.isSubmitting = false;
     }} else {{
       this.markFormGroupTouched();
     }}
