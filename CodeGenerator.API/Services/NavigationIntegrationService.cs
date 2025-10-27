@@ -1,4 +1,5 @@
 using CodeGenerator.API.Models;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace CodeGenerator.API.Services;
@@ -14,8 +15,11 @@ public class NavigationIntegrationService
 
     public async Task UpdateAppRoutesAsync(DatabaseTable table, string angularPath)
     {
-        var className = ToPascalCase(table.TableName);
-        var camelCaseName = ToCamelCase(table.TableName);
+        var naming = GetEntityNaming(table.TableName);
+        var className = naming.SingularPascal;
+        var singularFolder = naming.SingularCamel;
+        var componentFolder = naming.PluralCamel;
+        var routeSegment = naming.PluralKebab;
         var routesFilePath = Path.Combine(angularPath, "app.routes.ts");
 
         try
@@ -30,7 +34,6 @@ public class NavigationIntegrationService
 
             // Check if imports already exist
             var listImportPattern = $@"import\s*{{\s*{className}List\s*}}\s*from\s*'[^']*'";
-            var formImportPattern = $@"import\s*{{\s*{className}Form\s*}}\s*from\s*'[^']*'";
 
             if (!Regex.IsMatch(content, listImportPattern, RegexOptions.IgnoreCase))
             {
@@ -39,22 +42,33 @@ public class NavigationIntegrationService
                 if (importInsertPoint != -1)
                 {
                     var endOfLine = content.IndexOf('\n', importInsertPoint);
-                    var newImports = $"\nimport {{ {className}List }} from './components/{camelCaseName}-list/{camelCaseName}-list';\nimport {{ {className}Form }} from './components/{camelCaseName}-form/{camelCaseName}-form';";
+                    var newImports = $"\nimport {{ {className}List }} from './components/{componentFolder}-list/{componentFolder}-list';\nimport {{ {className}Form }} from './components/{componentFolder}-form/{componentFolder}-form';";
                     content = content.Insert(endOfLine, newImports);
                 }
             }
+            else
+            {
+                // Normalize previously generated imports that used singular folder names
+                var oldListPath = $"./components/{singularFolder}-list/{singularFolder}-list";
+                var oldFormPath = $"./components/{singularFolder}-form/{singularFolder}-form";
+                var newListPath = $"./components/{componentFolder}-list/{componentFolder}-list";
+                var newFormPath = $"./components/{componentFolder}-form/{componentFolder}-form";
+
+                content = content.Replace(oldListPath, newListPath);
+                content = content.Replace(oldFormPath, newFormPath);
+            }
 
             // Check if routes already exist
-            var routePattern = $@"path:\s*'{camelCaseName}'";
+            var routePattern = $@"path:\s*'{routeSegment}'";
             if (!Regex.IsMatch(content, routePattern, RegexOptions.IgnoreCase))
             {
                 // Add routes before the wildcard route
                 var wildcardIndex = content.IndexOf("{ path: '**'");
                 if (wildcardIndex != -1)
                 {
-                    var newRoutes = $"  {{ path: '{camelCaseName}', component: {className}List, canActivate: [authGuard] }},\n" +
-                                  $"  {{ path: '{camelCaseName}/new', component: {className}Form, canActivate: [authGuard] }},\n" +
-                                  $"  {{ path: '{camelCaseName}/edit/:id', component: {className}Form, canActivate: [authGuard] }},\n  ";
+                    var newRoutes = $"  {{ path: '{routeSegment}', component: {className}List, canActivate: [authGuard] }},\n" +
+                                  $"  {{ path: '{routeSegment}/new', component: {className}Form, canActivate: [authGuard] }},\n" +
+                                  $"  {{ path: '{routeSegment}/edit/:id', component: {className}Form, canActivate: [authGuard] }},\n  ";
                     content = content.Insert(wildcardIndex, newRoutes);
                 }
             }
@@ -70,8 +84,9 @@ public class NavigationIntegrationService
 
     public async Task UpdateSidebarAsync(DatabaseTable table, string angularPath)
     {
-        var className = ToPascalCase(table.TableName);
-        var camelCaseName = ToCamelCase(table.TableName);
+        var naming = GetEntityNaming(table.TableName);
+        var className = naming.SingularPascal;
+        var routeSegment = naming.PluralKebab;
         var sidebarFilePath = Path.Combine(angularPath, "components", "sidebar", "sidebar.ts");
 
         try
@@ -94,7 +109,7 @@ public class NavigationIntegrationService
 
                 if (settingsMatch.Success)
                 {
-                    var newMenuItem = $"    {{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }},\n    ";
+                    var newMenuItem = $"    {{ title: '{className}', icon: '📋', route: '/{routeSegment}' }},\n    ";
                     content = content.Insert(settingsMatch.Index, newMenuItem);
                 }
                 else
@@ -109,7 +124,7 @@ public class NavigationIntegrationService
                         if (closingBracketIndex != -1)
                         {
                             var insertPosition = menuItemsMatch.Index + closingBracketIndex;
-                            var newMenuItem = $",\n    {{ title: '{className}', icon: '📋', route: '/{camelCaseName}' }}";
+                            var newMenuItem = $",\n    {{ title: '{className}', icon: '📋', route: '/{routeSegment}' }}";
                             content = content.Insert(insertPosition, newMenuItem);
                         }
                     }
@@ -131,8 +146,9 @@ public class NavigationIntegrationService
 
     public async Task RemoveFromAppRoutesAsync(string tableName, string angularPath)
     {
-        var className = ToPascalCase(tableName);
-        var camelCaseName = ToCamelCase(tableName);
+        var naming = GetEntityNaming(tableName);
+        var className = naming.SingularPascal;
+        var routeSegment = naming.PluralKebab;
         var routesFilePath = Path.Combine(angularPath, "app.routes.ts");
 
         try
@@ -151,9 +167,9 @@ public class NavigationIntegrationService
             // Remove routes
             var routePatterns = new[]
             {
-                $@"\s*{{\s*path:\s*'{camelCaseName}',\s*component:\s*{className}List[^}}]*}},?\s*\n?",
-                $@"\s*{{\s*path:\s*'{camelCaseName}/new',\s*component:\s*{className}Form[^}}]*}},?\s*\n?",
-                $@"\s*{{\s*path:\s*'{camelCaseName}/edit/:id',\s*component:\s*{className}Form[^}}]*}},?\s*\n?"
+                $@"\s*{{\s*path:\s*'{routeSegment}',\s*component:\s*{className}List[^}}]*}},?\s*\n?",
+                $@"\s*{{\s*path:\s*'{routeSegment}/new',\s*component:\s*{className}Form[^}}]*}},?\s*\n?",
+                $@"\s*{{\s*path:\s*'{routeSegment}/edit/:id',\s*component:\s*{className}Form[^}}]*}},?\s*\n?"
             };
 
             foreach (var pattern in routePatterns)
@@ -172,7 +188,8 @@ public class NavigationIntegrationService
 
     public async Task RemoveFromSidebarAsync(string tableName, string angularPath)
     {
-        var className = ToPascalCase(tableName);
+        var naming = GetEntityNaming(tableName);
+        var className = naming.SingularPascal;
         var sidebarFilePath = Path.Combine(angularPath, "components", "sidebar", "sidebar.ts");
 
         try
@@ -195,6 +212,19 @@ public class NavigationIntegrationService
         }
     }
 
+    private static EntityNaming GetEntityNaming(string tableName)
+    {
+        var baseName = ToPascalCase(tableName);
+        var singular = Singularize(baseName);
+        var plural = Pluralize(singular);
+
+        return new EntityNaming(
+            singular,
+            ToCamelFromPascal(singular),
+            ToCamelFromPascal(plural),
+            ToKebabCase(plural));
+    }
+
     private static string ToPascalCase(string input)
     {
         if (string.IsNullOrEmpty(input))
@@ -208,9 +238,88 @@ public class NavigationIntegrationService
             .Select(word => char.ToUpper(word[0]) + word.Substring(1).ToLower()));
     }
 
-    private static string ToCamelCase(string input)
+    private static string Singularize(string name)
     {
-        var pascalCase = ToPascalCase(input);
-        return char.ToLower(pascalCase[0]) + pascalCase.Substring(1);
+        if (string.IsNullOrWhiteSpace(name))
+            return name;
+
+        if (name.EndsWith("ies", StringComparison.OrdinalIgnoreCase))
+            return name[..^3] + "y";
+
+        if (name.EndsWith("ses", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith("xes", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith("zes", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith("ches", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith("shes", StringComparison.OrdinalIgnoreCase))
+            return name[..^2];
+
+        if (name.EndsWith("s", StringComparison.OrdinalIgnoreCase) &&
+            !name.EndsWith("ss", StringComparison.OrdinalIgnoreCase) &&
+            !name.EndsWith("us", StringComparison.OrdinalIgnoreCase))
+            return name[..^1];
+
+        return name;
     }
+
+    private static string Pluralize(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return name;
+
+        if (name.EndsWith("y", StringComparison.OrdinalIgnoreCase) && name.Length > 1 && !IsVowel(name[^2]))
+            return name[..^1] + "ies";
+
+        if (name.EndsWith("s", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith("x", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith("z", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith("ch", StringComparison.OrdinalIgnoreCase) ||
+            name.EndsWith("sh", StringComparison.OrdinalIgnoreCase))
+            return name + "es";
+
+        return name + "s";
+    }
+
+    private static bool IsVowel(char c)
+    {
+        return "aeiou".Contains(char.ToLowerInvariant(c));
+    }
+
+    private static string ToCamelFromPascal(string pascal)
+    {
+        return string.IsNullOrEmpty(pascal)
+            ? pascal
+            : char.ToLowerInvariant(pascal[0]) + pascal[1..];
+    }
+
+    private static string ToKebabCase(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return name;
+
+        var sb = new System.Text.StringBuilder(name.Length * 2);
+        for (int i = 0; i < name.Length; i++)
+        {
+            var ch = name[i];
+            if (char.IsUpper(ch))
+            {
+                if (i > 0)
+                {
+                    sb.Append('-');
+                }
+                sb.Append(char.ToLowerInvariant(ch));
+            }
+            else
+            {
+                sb.Append(char.ToLowerInvariant(ch));
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private sealed record EntityNaming(
+        string SingularPascal,
+        string SingularCamel,
+        string PluralCamel,
+        string PluralKebab);
 }

@@ -20,8 +20,7 @@ export class Sidebar {
   menuItems: MenuItem[] = [
     { title: 'Dashboard', icon: '📊', route: '/dashboard' },
     { title: 'Code Generator', icon: '⚙️', route: '/generator' },
-    { title: 'Products', icon: '📦', route: '/products' },
-    { title: 'Settings', icon: '⚙️', route: '/settings' }
+    { title: 'Products', icon: '📦', route: '/products' },{ title: 'Settings', icon: '⚙️', route: '/settings' }
   ];
 
   constructor() {}

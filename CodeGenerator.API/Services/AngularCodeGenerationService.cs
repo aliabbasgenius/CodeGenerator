@@ -24,9 +24,10 @@ namespace CodeGenerator.API.Services
             _logger = logger;
         }
 
-        public string GenerateModel(DatabaseTable table)
-        {
-            var className = ToPascalCase(table.TableName);
+    public string GenerateModel(DatabaseTable table)
+    {
+      var names = GetEntityNaming(table);
+      var className = names.SingularPascal;
             var sb = new StringBuilder();
 
             sb.AppendLine($"export interface {className} {{");
@@ -43,26 +44,28 @@ namespace CodeGenerator.API.Services
             return sb.ToString();
         }
 
-        public string GenerateService(DatabaseTable table)
-        {
-            var className = ToPascalCase(table.TableName);
-            var serviceName = $"{className}Service";
-            var interfaceName = className;
-            var camelCaseName = ToCamelCase(table.TableName);
+    public string GenerateService(DatabaseTable table)
+    {
+      var names = GetEntityNaming(table);
+      var className = names.SingularPascal;
+      var serviceName = $"{className}Service";
+      var interfaceName = className;
+  var camelCaseName = names.SingularCamel;
+  var pluralCamelCaseName = names.PluralCamel;
             var primaryKey = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
             var primaryKeyType = primaryKey?.TypeScriptType ?? "number";
             var primaryKeyProperty = primaryKey?.ColumnName != null ? ToCamelCase(primaryKey.ColumnName) : "id";
 
             var template = $@"import {{ Injectable }} from '@angular/core';
 import {{ BehaviorSubject, Observable }} from 'rxjs';
-import {{ {interfaceName} }} from '../models/{camelCaseName}.model';
+import {{ {interfaceName} }} from '../models/{pluralCamelCaseName}.model';
 
 @Injectable({{
   providedIn: 'root'
 }})
 export class {serviceName} {{
-  private {camelCaseName}s: {interfaceName}[] = [];
-  private {camelCaseName}sSubject = new BehaviorSubject<{interfaceName}[]>([]);
+  private {pluralCamelCaseName}: {interfaceName}[] = [];
+  private {pluralCamelCaseName}Subject = new BehaviorSubject<{interfaceName}[]>([]);
   private nextId = 1;
 
   constructor() {{
@@ -75,16 +78,16 @@ export class {serviceName} {{
       // TODO: Add sample data based on your table structure
     ];
     
-    this.{camelCaseName}s = sampleData;
-    this.{camelCaseName}sSubject.next(this.{camelCaseName}s);
+    this.{pluralCamelCaseName} = sampleData;
+    this.{pluralCamelCaseName}Subject.next(this.{pluralCamelCaseName});
   }}
 
   get{className}s(): Observable<{interfaceName}[]> {{
-    return this.{camelCaseName}sSubject.asObservable();
+    return this.{pluralCamelCaseName}Subject.asObservable();
   }}
 
   get{className}ById(id: {primaryKeyType}): {interfaceName} | undefined {{
-    return this.{camelCaseName}s.find(item => item.{primaryKeyProperty} === id);
+    return this.{pluralCamelCaseName}.find(item => item.{primaryKeyProperty} === id);
   }}
 
   add{className}(item: Omit<{interfaceName}, '{primaryKeyProperty}'>): boolean {{
@@ -94,8 +97,8 @@ export class {serviceName} {{
         {primaryKeyProperty}: this.nextId++
       }} as {interfaceName};
       
-      this.{camelCaseName}s.push(new{className});
-      this.{camelCaseName}sSubject.next([...this.{camelCaseName}s]);
+      this.{pluralCamelCaseName}.push(new{className});
+      this.{pluralCamelCaseName}Subject.next([...this.{pluralCamelCaseName}]);
       return true;
     }} catch (error) {{
       console.error('Error adding {camelCaseName}:', error);
@@ -105,10 +108,10 @@ export class {serviceName} {{
 
   update{className}(id: {primaryKeyType}, updates: Partial<{interfaceName}>): boolean {{
     try {{
-      const index = this.{camelCaseName}s.findIndex(item => item.{primaryKeyProperty} === id);
+      const index = this.{pluralCamelCaseName}.findIndex(item => item.{primaryKeyProperty} === id);
       if (index !== -1) {{
-        this.{camelCaseName}s[index] = {{ ...this.{camelCaseName}s[index], ...updates }};
-        this.{camelCaseName}sSubject.next([...this.{camelCaseName}s]);
+        this.{pluralCamelCaseName}[index] = {{ ...this.{pluralCamelCaseName}[index], ...updates }};
+        this.{pluralCamelCaseName}Subject.next([...this.{pluralCamelCaseName}]);
         return true;
       }}
       return false;
@@ -120,10 +123,10 @@ export class {serviceName} {{
 
   delete{className}(id: {primaryKeyType}): boolean {{
     try {{
-      const index = this.{camelCaseName}s.findIndex(item => item.{primaryKeyProperty} === id);
+      const index = this.{pluralCamelCaseName}.findIndex(item => item.{primaryKeyProperty} === id);
       if (index !== -1) {{
-        this.{camelCaseName}s.splice(index, 1);
-        this.{camelCaseName}sSubject.next([...this.{camelCaseName}s]);
+        this.{pluralCamelCaseName}.splice(index, 1);
+        this.{pluralCamelCaseName}Subject.next([...this.{pluralCamelCaseName}]);
         return true;
       }}
       return false;
@@ -135,11 +138,11 @@ export class {serviceName} {{
 
   search{className}s(searchTerm: string): {interfaceName}[] {{
     if (!searchTerm.trim()) {{
-      return this.{camelCaseName}s;
+      return this.{pluralCamelCaseName};
     }}
     
     const term = searchTerm.toLowerCase();
-    return this.{camelCaseName}s.filter(item => {{
+    return this.{pluralCamelCaseName}.filter(item => {{
       // Search in all string properties
 {GenerateSearchLogic(table)}
     }});
@@ -179,23 +182,26 @@ export class {serviceName} {{
             return sb.ToString();
         }
 
-        public string GenerateListComponent(DatabaseTable table)
-        {
-            var className = ToPascalCase(table.TableName);
-            var serviceName = $"{className}Service";
-            var interfaceName = className;
-            var camelCaseName = ToCamelCase(table.TableName);
-            var componentName = $"{className}List";
-            var primaryKey = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
-            var primaryKeyProperty = primaryKey?.ColumnName != null ? ToCamelCase(primaryKey.ColumnName) : "id";
+    public string GenerateListComponent(DatabaseTable table)
+    {
+    var names = GetEntityNaming(table);
+    var className = names.SingularPascal;
+    var serviceName = $"{className}Service";
+    var interfaceName = className;
+    var camelCaseName = names.SingularCamel;
+    var pluralCamelCaseName = names.PluralCamel;
+    var routeSegment = names.PluralKebab;
+    var componentName = $"{className}List";
+    var primaryKey = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
+    var primaryKeyProperty = primaryKey?.ColumnName != null ? ToCamelCase(primaryKey.ColumnName) : "id";
 
             var template = $@"import {{ Component, OnInit, OnDestroy }} from '@angular/core';
 import {{ CommonModule }} from '@angular/common';
 import {{ FormsModule }} from '@angular/forms';
 import {{ Router }} from '@angular/router';
 import {{ Subscription }} from 'rxjs';
-import {{ {serviceName} }} from '../../services/{camelCaseName}.service';
-import {{ {interfaceName} }} from '../../models/{camelCaseName}.model';
+import {{ {serviceName} }} from '../../services/{pluralCamelCaseName}.service';
+import {{ {interfaceName} }} from '../../models/{pluralCamelCaseName}.model';
 import {{ Header }} from '../header/header';
 import {{ Sidebar }} from '../sidebar/sidebar';
 import {{ Footer }} from '../footer/footer';
@@ -204,11 +210,11 @@ import {{ Footer }} from '../footer/footer';
   selector: 'app-{camelCaseName}-list',
   standalone: true,
   imports: [CommonModule, FormsModule, Header, Sidebar, Footer],
-  templateUrl: './{camelCaseName}-list.html',
-  styleUrl: './{camelCaseName}-list.css'
+  templateUrl: './{pluralCamelCaseName}-list.html',
+  styleUrl: './{pluralCamelCaseName}-list.css'
 }})
 export class {componentName} implements OnInit, OnDestroy {{
-  {camelCaseName}s: {interfaceName}[] = [];
+  {pluralCamelCaseName}: {interfaceName}[] = [];
   filtered{className}s: {interfaceName}[] = [];
   searchTerm: string = '';
   selectedCategory: string = '';
@@ -241,8 +247,8 @@ export class {componentName} implements OnInit, OnDestroy {{
 
   load{className}s(): void {{
     this.subscription.add(
-      this.{camelCaseName}Service.get{className}s().subscribe({camelCaseName}s => {{
-        this.{camelCaseName}s = {camelCaseName}s;
+      this.{camelCaseName}Service.get{className}s().subscribe({pluralCamelCaseName} => {{
+        this.{pluralCamelCaseName} = {pluralCamelCaseName};
         this.applyFiltersAndSort();
       }})
     );
@@ -253,7 +259,7 @@ export class {componentName} implements OnInit, OnDestroy {{
   }}
 
   applyFiltersAndSort(): void {{
-    let filtered = [...this.{camelCaseName}s];
+    let filtered = [...this.{pluralCamelCaseName}];
 
     // Apply search filter
     if (this.searchTerm.trim()) {{
@@ -344,11 +350,11 @@ export class {componentName} implements OnInit, OnDestroy {{
   }}
 
   add{className}(): void {{
-    this.router.navigate(['/{camelCaseName}s/new']);
+    this.router.navigate(['/{routeSegment}/new']);
   }}
 
   edit{className}(item: {interfaceName}): void {{
-    this.router.navigate(['/{camelCaseName}s/edit', item.{primaryKeyProperty}]);
+    this.router.navigate(['/{routeSegment}/edit', item.{primaryKeyProperty}]);
   }}
 
   delete{className}(item: {interfaceName}): void {{
@@ -422,23 +428,25 @@ export class {componentName} implements OnInit, OnDestroy {{
             return template;
         }
 
-        public string GenerateFormComponent(DatabaseTable table)
-        {
-            var className = ToPascalCase(table.TableName);
-            var serviceName = $"{className}Service";
-            var interfaceName = className;
-            var camelCaseName = ToCamelCase(table.TableName);
-            var componentName = $"{className}Form";
-            var primaryKey = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
-            var primaryKeyProperty = primaryKey?.ColumnName != null ? ToCamelCase(primaryKey.ColumnName) : "id";
-            var primaryKeyType = primaryKey?.TypeScriptType ?? "number";
+  public string GenerateFormComponent(DatabaseTable table)
+  {
+    var names = GetEntityNaming(table);
+    var className = names.SingularPascal;
+    var serviceName = $"{className}Service";
+    var interfaceName = className;
+    var camelCaseName = names.SingularCamel;
+    var pluralCamelCaseName = names.PluralCamel;
+    var routeSegment = names.PluralKebab;
+    var componentName = $"{className}Form";
+    var primaryKey = table.Columns.FirstOrDefault(c => c.IsPrimaryKey);
+    var primaryKeyType = primaryKey?.TypeScriptType ?? "number";
 
             var template = $@"import {{ Component, OnInit }} from '@angular/core';
 import {{ CommonModule }} from '@angular/common';
 import {{ ReactiveFormsModule, FormBuilder, FormGroup, Validators }} from '@angular/forms';
 import {{ Router, ActivatedRoute }} from '@angular/router';
-import {{ {serviceName} }} from '../../services/{camelCaseName}.service';
-import {{ {interfaceName} }} from '../../models/{camelCaseName}.model';
+import {{ {serviceName} }} from '../../services/{pluralCamelCaseName}.service';
+import {{ {interfaceName} }} from '../../models/{pluralCamelCaseName}.model';
 import {{ Header }} from '../header/header';
 import {{ Sidebar }} from '../sidebar/sidebar';
 import {{ Footer }} from '../footer/footer';
@@ -447,8 +455,8 @@ import {{ Footer }} from '../footer/footer';
   selector: 'app-{camelCaseName}-form',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, Header, Sidebar, Footer],
-  templateUrl: './{camelCaseName}-form.html',
-  styleUrl: './{camelCaseName}-form.css'
+  templateUrl: './{pluralCamelCaseName}-form.html',
+  styleUrl: './{pluralCamelCaseName}-form.css'
 }})
 export class {componentName} implements OnInit {{
   {camelCaseName}Form: FormGroup;
@@ -488,7 +496,7 @@ export class {componentName} implements OnInit {{
         this.{camelCaseName}Form.patchValue({camelCaseName});
       }} else {{
         alert('{className} not found');
-        this.router.navigate(['/{camelCaseName}s']);
+        this.router.navigate(['/{routeSegment}']);
       }}
     }}
   }}
@@ -502,17 +510,17 @@ export class {componentName} implements OnInit {{
         const success = this.{camelCaseName}Service.update{className}(this.{camelCaseName}Id, formValue);
         if (success) {{
           alert('{className} updated successfully!');
-          this.router.navigate(['/{camelCaseName}s']);
+          this.router.navigate(['/{routeSegment}']);
         }} else {{
-          alert('Failed to update {camelCaseName}');
+          alert('Failed to update {className}');
         }}
       }} else {{
         const success = this.{camelCaseName}Service.add{className}(formValue);
         if (success) {{
           alert('{className} created successfully!');
-          this.router.navigate(['/{camelCaseName}s']);
+          this.router.navigate(['/{routeSegment}']);
         }} else {{
-          alert('Failed to create {camelCaseName}');
+          alert('Failed to create {className}');
         }}
       }}
       this.isSubmitting = false;
@@ -529,7 +537,7 @@ export class {componentName} implements OnInit {{
   }}
 
   onCancel(): void {{
-    this.router.navigate(['/{camelCaseName}s']);
+    this.router.navigate(['/{routeSegment}']);
   }}
 
   getFieldError(fieldName: string): string {{
@@ -618,10 +626,11 @@ export class {componentName} implements OnInit {{
             };
         }
 
-        public string GenerateListHtml(DatabaseTable table)
-        {
-            var className = ToPascalCase(table.TableName);
-            var camelCaseName = ToCamelCase(table.TableName);
+    public string GenerateListHtml(DatabaseTable table)
+    {
+      var names = GetEntityNaming(table);
+      var className = names.SingularPascal;
+      var camelCaseName = names.SingularCamel;
             var displayColumns = table.Columns.Take(5).ToList(); // Show first 5 columns in table
 
             var template = $@"<div class=""page-layout"">
@@ -794,10 +803,11 @@ export class {componentName} implements OnInit {{
             };
         }
 
-        public string GenerateFormHtml(DatabaseTable table)
-        {
-            var className = ToPascalCase(table.TableName);
-            var camelCaseName = ToCamelCase(table.TableName);
+    public string GenerateFormHtml(DatabaseTable table)
+    {
+      var names = GetEntityNaming(table);
+      var className = names.SingularPascal;
+      var camelCaseName = names.SingularCamel;
             var nonIdentityColumns = table.Columns.Where(c => !c.IsIdentity).ToList();
 
             var template = $@"<div class=""page-layout"">
@@ -926,9 +936,10 @@ export class {componentName} implements OnInit {{
             };
         }
 
-        public string GenerateListCss(DatabaseTable table)
-        {
-            var camelCaseName = ToCamelCase(table.TableName);
+    public string GenerateListCss(DatabaseTable table)
+    {
+      var names = GetEntityNaming(table);
+      var camelCaseName = names.SingularCamel;
             
             return $@".page-layout {{
   min-height: 100vh;
@@ -1232,9 +1243,10 @@ export class {componentName} implements OnInit {{
 }}";
         }
 
-        public string GenerateFormCss(DatabaseTable table)
-        {
-            var camelCaseName = ToCamelCase(table.TableName);
+    public string GenerateFormCss(DatabaseTable table)
+    {
+      var names = GetEntityNaming(table);
+      var camelCaseName = names.SingularCamel;
             
             return $@".page-layout {{
   min-height: 100vh;
@@ -1404,22 +1416,133 @@ select.form-input {{
 }}";
         }
 
-        private string ToPascalCase(string input)
-        {
-            return string.Join("", input.Split('_', '-', ' ')
-                .Select(word => char.ToUpperInvariant(word[0]) + word.Substring(1).ToLowerInvariant()));
-        }
+    private EntityNaming GetEntityNaming(DatabaseTable table) => GetEntityNaming(table.TableName);
 
-        private string ToCamelCase(string input)
-        {
-            var pascalCase = ToPascalCase(input);
-            return char.ToLowerInvariant(pascalCase[0]) + pascalCase.Substring(1);
-        }
+    private EntityNaming GetEntityNaming(string tableName)
+    {
+      var rawName = tableName.Contains('.')
+        ? tableName[(tableName.LastIndexOf('.') + 1)..]
+        : tableName;
 
-        private string ToDisplayName(string input)
+      var pascalPluralFromTable = ToPascalCase(rawName);
+      var pascalSingular = Singularize(pascalPluralFromTable);
+      var pascalPlural = Pluralize(pascalSingular);
+
+      var singularCamel = ToCamelFromPascal(pascalSingular);
+      var pluralCamel = ToCamelFromPascal(pascalPlural);
+
+      return new EntityNaming(
+        pascalSingular,
+        singularCamel,
+        pascalPlural,
+        pluralCamel,
+        ToKebabCase(pascalSingular),
+        ToKebabCase(pascalPlural));
+    }
+
+    private static string Singularize(string name)
+    {
+      if (string.IsNullOrWhiteSpace(name))
+        return name;
+
+      if (name.EndsWith("ies", StringComparison.OrdinalIgnoreCase))
+        return name[..^3] + "y";
+
+      if (name.EndsWith("ses", StringComparison.OrdinalIgnoreCase) ||
+        name.EndsWith("xes", StringComparison.OrdinalIgnoreCase) ||
+        name.EndsWith("zes", StringComparison.OrdinalIgnoreCase) ||
+        name.EndsWith("ches", StringComparison.OrdinalIgnoreCase) ||
+        name.EndsWith("shes", StringComparison.OrdinalIgnoreCase))
+        return name[..^2];
+
+      if (name.EndsWith("s", StringComparison.OrdinalIgnoreCase) &&
+        !name.EndsWith("ss", StringComparison.OrdinalIgnoreCase) &&
+        !name.EndsWith("us", StringComparison.OrdinalIgnoreCase))
+        return name[..^1];
+
+      return name;
+    }
+
+    private static string Pluralize(string name)
+    {
+      if (string.IsNullOrWhiteSpace(name))
+        return name;
+
+      if (name.EndsWith("y", StringComparison.OrdinalIgnoreCase) && name.Length > 1 && !IsVowel(name[^2]))
+        return name[..^1] + "ies";
+
+      if (name.EndsWith("s", StringComparison.OrdinalIgnoreCase) ||
+        name.EndsWith("x", StringComparison.OrdinalIgnoreCase) ||
+        name.EndsWith("z", StringComparison.OrdinalIgnoreCase) ||
+        name.EndsWith("ch", StringComparison.OrdinalIgnoreCase) ||
+        name.EndsWith("sh", StringComparison.OrdinalIgnoreCase))
+        return name + "es";
+
+      return name + "s";
+    }
+
+    private static bool IsVowel(char c)
+    {
+      return "aeiou".Contains(char.ToLowerInvariant(c));
+    }
+
+    private static string ToCamelFromPascal(string pascal)
+    {
+      return string.IsNullOrEmpty(pascal)
+        ? pascal
+        : char.ToLowerInvariant(pascal[0]) + pascal[1..];
+    }
+
+    private static string ToKebabCase(string name)
+    {
+      if (string.IsNullOrWhiteSpace(name))
+        return name;
+
+      var sb = new StringBuilder(name.Length * 2);
+      for (int i = 0; i < name.Length; i++)
+      {
+        var ch = name[i];
+        if (char.IsUpper(ch))
         {
-            return string.Join(" ", input.Split('_', '-')
-                .Select(word => char.ToUpperInvariant(word[0]) + word.Substring(1).ToLowerInvariant()));
+          if (i > 0)
+          {
+            sb.Append('-');
+          }
+          sb.Append(char.ToLowerInvariant(ch));
         }
+        else
+        {
+          sb.Append(char.ToLowerInvariant(ch));
+        }
+      }
+
+      return sb.ToString();
+    }
+
+    private string ToPascalCase(string input)
+    {
+      return string.Join("", input.Split('_', '-', ' ')
+        .Select(word => char.ToUpperInvariant(word[0]) + word.Substring(1).ToLowerInvariant()));
+    }
+
+    private string ToCamelCase(string input)
+    {
+      var pascalCase = ToPascalCase(input);
+      return char.ToLowerInvariant(pascalCase[0]) + pascalCase.Substring(1);
+    }
+
+    private string ToDisplayName(string input)
+    {
+      return string.Join(" ", input.Split('_', '-')
+        .Select(word => char.ToUpperInvariant(word[0]) + word.Substring(1).ToLowerInvariant()));
+    }
+
+    private sealed record EntityNaming(
+      string SingularPascal,
+      string SingularCamel,
+      string PluralPascal,
+      string PluralCamel,
+      string SingularKebab,
+      string PluralKebab);
     }
 }
