@@ -258,11 +258,11 @@ public class ApiCodeGenerationService : IApiCodeGenerationService
         sb.AppendLine(Indent3 + "_context.Entry(request).State = EntityState.Modified;");
         sb.AppendLine(Indent3 + "await _context.SaveChangesAsync();");
         sb.AppendLine(Indent2 + "}");
-        sb.AppendLine(Indent2 + "catch (DbUpdateConcurrencyException ex)");
-        sb.AppendLine(Indent2 + "{");
-        sb.AppendLine(Indent3 + "_logger.LogError(ex, \"Concurrency conflict while updating {Entity}\", typeof({entityName}).Name);");
-        sb.AppendLine(Indent3 + "return StatusCode(StatusCodes.Status409Conflict, \"A concurrency conflict occurred while updating the resource.\");");
-        sb.AppendLine(Indent2 + "}");
+    sb.AppendLine(Indent2 + "catch (DbUpdateConcurrencyException ex)");
+    sb.AppendLine(Indent2 + "{");
+    sb.AppendLine(Indent3 + $"_logger.LogError(ex, \"Concurrency conflict while updating {{Entity}}\", typeof({entityName}).Name);");
+    sb.AppendLine(Indent3 + "return StatusCode(StatusCodes.Status409Conflict, \"A concurrency conflict occurred while updating the resource.\");");
+    sb.AppendLine(Indent2 + "}");
         sb.AppendLine();
         sb.AppendLine(Indent2 + "return NoContent();");
         sb.AppendLine(Indent1 + "}");
