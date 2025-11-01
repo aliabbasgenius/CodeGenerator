@@ -3,6 +3,7 @@ using CodeGenerator.API.Services;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace CodeGenerator.API.Services
 {
@@ -566,8 +567,39 @@ namespace CodeGenerator.API.Services
 
         private static string ToPascalCase(string input)
         {
-            return string.Join("", input.Split('_', '-', ' ')
-                .Select(word => char.ToUpperInvariant(word[0]) + word.Substring(1).ToLowerInvariant()));
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return input;
+            }
+
+            var sanitized = input.Replace("_", " ").Replace("-", " ");
+            var tokens = sanitized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            var words = tokens
+                .SelectMany(token => Regex.Matches(token, "[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\\d+").Select(match => match.Value))
+                .ToList();
+
+            if (words.Count == 0)
+            {
+                return char.ToUpperInvariant(input[0]) + input.Substring(1);
+            }
+
+            static string FormatWord(string word)
+            {
+                if (word.All(char.IsDigit))
+                {
+                    return word;
+                }
+
+                if (word.Length <= 3 && word.All(char.IsUpper))
+                {
+                    return word.ToUpperInvariant();
+                }
+
+                return char.ToUpperInvariant(word[0]) + word.Substring(1).ToLowerInvariant();
+            }
+
+            return string.Concat(words.Select(FormatWord));
         }
 
         private static string ToCamelCase(string input)

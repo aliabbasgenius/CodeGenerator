@@ -1,4 +1,5 @@
 using CodeGenerator.API.Models;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -84,8 +85,9 @@ public class NavigationIntegrationService
 
     public async Task UpdateSidebarAsync(DatabaseTable table, string angularPath)
     {
-        var naming = GetEntityNaming(table.TableName);
-        var className = naming.SingularPascal;
+    var naming = GetEntityNaming(table.TableName);
+    var className = naming.SingularPascal;
+    var displayName = ToDisplayName(className);
         var routeSegment = naming.PluralKebab;
         var sidebarFilePath = Path.Combine(angularPath, "components", "sidebar", "sidebar.ts");
 
@@ -99,8 +101,15 @@ public class NavigationIntegrationService
 
             var content = await File.ReadAllTextAsync(sidebarFilePath);
 
+            // Normalize previously generated titles without spacing
+            var rawTitlePattern = $"title:\\s*'{Regex.Escape(className)}'";
+            if (Regex.IsMatch(content, rawTitlePattern, RegexOptions.IgnoreCase))
+            {
+                content = Regex.Replace(content, rawTitlePattern, $"title: '{displayName}'", RegexOptions.IgnoreCase);
+            }
+
             // Check if menu item already exists
-            var menuItemPattern = $@"title:\s*'{className}'";
+            var menuItemPattern = $@"title:\s*'(?:{Regex.Escape(className)}|{Regex.Escape(displayName)})'";
             if (!Regex.IsMatch(content, menuItemPattern, RegexOptions.IgnoreCase))
             {
                 // Find the menuItems array and add the new item before Settings
@@ -109,7 +118,7 @@ public class NavigationIntegrationService
 
                 if (settingsMatch.Success)
                 {
-                    var newMenuItem = $"    {{ title: '{className}', icon: '📋', route: '/{routeSegment}' }},\n    ";
+                    var newMenuItem = $"    {{ title: '{displayName}', icon: '📋', route: '/{routeSegment}' }},\n    ";
                     content = content.Insert(settingsMatch.Index, newMenuItem);
                 }
                 else
@@ -124,7 +133,7 @@ public class NavigationIntegrationService
                         if (closingBracketIndex != -1)
                         {
                             var insertPosition = menuItemsMatch.Index + closingBracketIndex;
-                            var newMenuItem = $",\n    {{ title: '{className}', icon: '📋', route: '/{routeSegment}' }}";
+                            var newMenuItem = $",\n    {{ title: '{displayName}', icon: '📋', route: '/{routeSegment}' }}";
                             content = content.Insert(insertPosition, newMenuItem);
                         }
                     }
@@ -197,10 +206,18 @@ public class NavigationIntegrationService
             if (!File.Exists(sidebarFilePath))
                 return;
 
+            var displayName = ToDisplayName(className);
             var content = await File.ReadAllTextAsync(sidebarFilePath);
 
+            // Normalize previously generated titles without spacing
+            var rawTitlePattern = $"title:\\s*'{Regex.Escape(className)}'";
+            if (Regex.IsMatch(content, rawTitlePattern, RegexOptions.IgnoreCase))
+            {
+                content = Regex.Replace(content, rawTitlePattern, $"title: '{displayName}'", RegexOptions.IgnoreCase);
+            }
+
             // Remove menu item
-            var menuItemPattern = $@"\s*{{\s*title:\s*'{className}'[^}}]*}},?\s*\n?";
+            var menuItemPattern = $@"\s*{{\s*title:\s*'(?:{Regex.Escape(className)}|{Regex.Escape(displayName)})'[^}}]*}},?\s*\n?";
             content = Regex.Replace(content, menuItemPattern, "", RegexOptions.IgnoreCase);
 
             await File.WriteAllTextAsync(sidebarFilePath, content);
@@ -227,15 +244,34 @@ public class NavigationIntegrationService
 
     private static string ToPascalCase(string input)
     {
-        if (string.IsNullOrEmpty(input))
+        if (string.IsNullOrWhiteSpace(input))
             return input;
 
-        // Remove schema prefix if present (e.g., "dbo.Authors" -> "Authors")
         if (input.Contains('.'))
-            input = input.Substring(input.LastIndexOf('.') + 1);
+            input = input[(input.LastIndexOf('.') + 1)..];
 
-        return string.Join("", input.Split('_')
-            .Select(word => char.ToUpper(word[0]) + word.Substring(1).ToLower()));
+        var sanitized = input.Replace("_", " ").Replace("-", " ");
+        var tokens = sanitized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        var words = tokens
+            .SelectMany(token => Regex.Matches(token, "[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\\d+").Select(m => m.Value))
+            .ToList();
+
+        if (words.Count == 0)
+            return char.ToUpperInvariant(input[0]) + input.Substring(1);
+
+        static string FormatWord(string word)
+        {
+            if (word.All(char.IsDigit))
+                return word;
+
+            if (word.Length <= 3 && word.All(char.IsUpper))
+                return word.ToUpperInvariant();
+
+            return char.ToUpperInvariant(word[0]) + word[1..].ToLowerInvariant();
+        }
+
+        return string.Concat(words.Select(FormatWord));
     }
 
     private static string Singularize(string name)
@@ -315,6 +351,25 @@ public class NavigationIntegrationService
         }
 
         return sb.ToString();
+    }
+
+    private static string ToDisplayName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return string.Empty;
+
+        var matches = Regex.Matches(name, "[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\\d+");
+        if (matches.Count == 0)
+            return name;
+
+        var words = matches
+            .Select(match => match.Value)
+            .Select(value => value.Length <= 2 && value.All(char.IsUpper)
+                ? value.ToUpperInvariant()
+                : char.ToUpperInvariant(value[0]) + value.Substring(1).ToLowerInvariant())
+            .ToList();
+
+        return string.Join(" ", words);
     }
 
     private sealed record EntityNaming(

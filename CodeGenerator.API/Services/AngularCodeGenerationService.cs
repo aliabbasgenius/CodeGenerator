@@ -1,5 +1,7 @@
 using System;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using CodeGenerator.API.Models;
 
 namespace CodeGenerator.API.Services
@@ -1524,8 +1526,31 @@ select.form-input {{
 
     private string ToPascalCase(string input)
     {
-      return string.Join("", input.Split('_', '-', ' ')
-        .Select(word => char.ToUpperInvariant(word[0]) + word.Substring(1).ToLowerInvariant()));
+      if (string.IsNullOrWhiteSpace(input))
+        return input;
+
+      var sanitized = input.Replace("_", " ").Replace("-", " ");
+      var tokens = sanitized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+      var words = tokens
+        .SelectMany(token => Regex.Matches(token, "[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\\d+").Select(m => m.Value))
+        .ToList();
+
+      if (words.Count == 0)
+        return char.ToUpperInvariant(input[0]) + input.Substring(1);
+
+      static string FormatWord(string word)
+      {
+        if (word.All(char.IsDigit))
+          return word;
+
+        if (word.Length <= 3 && word.All(char.IsUpper))
+          return word.ToUpperInvariant();
+
+        return char.ToUpperInvariant(word[0]) + word.Substring(1).ToLowerInvariant();
+      }
+
+      return string.Concat(words.Select(FormatWord));
     }
 
     private string ToCamelCase(string input)
@@ -1536,8 +1561,42 @@ select.form-input {{
 
     private string ToDisplayName(string input)
     {
-      return string.Join(" ", input.Split('_', '-')
-        .Select(word => char.ToUpperInvariant(word[0]) + word.Substring(1).ToLowerInvariant()));
+      if (string.IsNullOrWhiteSpace(input))
+      {
+        return string.Empty;
+      }
+
+      var tokens = input.Replace("_", " ").Replace("-", " ")
+        .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+      var words = new List<string>();
+
+      foreach (var token in tokens)
+      {
+        var matches = Regex.Matches(token, "[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\\d+");
+
+        if (matches.Count == 0)
+        {
+          words.Add(char.ToUpperInvariant(token[0]) + token.Substring(1).ToLowerInvariant());
+          continue;
+        }
+
+        foreach (Match match in matches)
+        {
+          var value = match.Value;
+
+          if (value.Length <= 2 && value.All(char.IsUpper))
+          {
+            words.Add(value.ToUpperInvariant());
+          }
+          else
+          {
+            words.Add(char.ToUpperInvariant(value[0]) + value.Substring(1).ToLowerInvariant());
+          }
+        }
+      }
+
+      return string.Join(" ", words);
     }
 
     private sealed record EntityNaming(
