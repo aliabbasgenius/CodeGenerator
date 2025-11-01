@@ -54,6 +54,7 @@ namespace CodeGenerator.API.Services
                     FROM INFORMATION_SCHEMA.TABLES t
                     WHERE t.TABLE_TYPE = 'BASE TABLE'
                     AND t.TABLE_SCHEMA != 'sys'
+                    AND t.TABLE_NAME != 'sysdiagrams'
                     ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME";
 
                 using var command = new Microsoft.Data.SqlClient.SqlCommand(query, connection);
